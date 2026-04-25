@@ -19,10 +19,6 @@
     {
       "src": "/api/(.*)",
       "dest": "/api/index.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/atsbrain-frontend/$1"
     }
   ]
 }
