@@ -19,6 +19,13 @@
     {
       "src": "/api/(.*)",
       "dest": "/api/index.py"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/atsbrain-frontend/index.html"
     }
   ]
 }
