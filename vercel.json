@@ -19,6 +19,23 @@
     {
       "src": "/api/(.*)",
       "dest": "/api/index.py"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/refresh-jobs",
+      "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/cron/job-alerts",
+      "schedule": "30 2 * * *"
     }
   ]
 }
