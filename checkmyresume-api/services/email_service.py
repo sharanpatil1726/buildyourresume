@@ -9,11 +9,11 @@ resend.api_key = settings.resend_api_key
 def send_welcome_email(to: str, name: str):
     try:
         resend.Emails.send({
-            "from":    "CheckMyResume <hello@atsbrain.in>",
+            "from":    "AtsBrain <hello@atsbrain.in>",
             "to":      to,
-            "subject": "Welcome to CheckMyResume 🎉",
+            "subject": "Welcome to AtsBrain 🎉",
             "html":    f"""
-                <h2>Hi {name}! Welcome to CheckMyResume.</h2>
+                <h2>Hi {name}! Welcome to AtsBrain.</h2>
                 <p>You're all set to start optimizing your resume and finding your next role.</p>
                 <p>Start by uploading your resume and analyzing it for your target role.</p>
                 <a href="https://atsbrain.in/dashboard/analyze"
@@ -31,7 +31,7 @@ def send_welcome_email(to: str, name: str):
 def send_payment_confirmation(to: str, name: str, plan: str, amount: int):
     try:
         resend.Emails.send({
-            "from":    "CheckMyResume <hello@atsbrain.in>",
+            "from":    "AtsBrain <hello@atsbrain.in>",
             "to":      to,
             "subject": f"Payment confirmed — {plan} plan activated ✓",
             "html":    f"""
@@ -58,7 +58,7 @@ def send_job_alert(to: str, name: str, role: str, jobs: list[dict]):
     )
     try:
         resend.Emails.send({
-            "from":    "CheckMyResume <alerts@atsbrain.in>",
+            "from":    "AtsBrain <alerts@atsbrain.in>",
             "to":      to,
             "subject": f"🔔 {len(jobs)} new {role} jobs in India",
             "html":    f"""

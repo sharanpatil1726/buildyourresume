@@ -15,7 +15,7 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting CheckMyResume API...")
+    logger.info("Starting AtsBrain API...")
     start_scheduler()
     logger.info("Job scheduler started — fetching every 2 hours")
     yield
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="CheckMyResume API",
+    title="AtsBrain API",
     description="ATS scoring, live jobs, and career tools for Indian job seekers",
     version="1.0.0",
     lifespan=lifespan,
@@ -55,7 +55,7 @@ app.include_router(tracker.router,  prefix="/api/tracker", tags=["Tracker"])
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "CheckMyResume API", "version": "1.0.0"}
+    return {"status": "ok", "service": "AtsBrain API", "version": "1.0.0"}
 
 @app.get("/health")
 async def health():

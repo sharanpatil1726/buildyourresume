@@ -30,10 +30,10 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
 
     # App
-    app_url: str = "http://localhost:8000"
-    frontend_url: str = "http://localhost:5173"
+    app_url: str = "https://atsbrain.in"
+    frontend_url: str = "https://atsbrain.in"
     cron_secret: str = "dev-secret"
-    environment: str = "development"
+    environment: str = "production"
 
     class Config:
         env_file = ".env"
