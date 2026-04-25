@@ -25,7 +25,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/atsbrain-frontend/index.html"
+      "dest": "/index.html"
     }
   ]
 }
