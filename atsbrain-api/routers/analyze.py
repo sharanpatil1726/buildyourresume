@@ -32,27 +32,35 @@ async def run_analysis(
         raise HTTPException(status_code=500, detail="Analysis failed. Please try again.")
 
     # Save scan to DB
-    scan = supabase_admin.table("scans").insert({
-        "user_id":          user.id,
-        "resume_id":        body.resume_id,
-        "target_role":      body.target_role,
-        "experience_level": body.experience_level,
-        "ats_score":        result["ats_score"],
-        "keyword_score":    result.get("keyword_score"),
-        "format_score":     result.get("format_score"),
-        "content_score":    result.get("content_score"),
-        "readability_score": result.get("readability_score"),
-        "result_json":      result,
-        "optimized_resume": result.get("optimized_resume"),
-    }).execute()
+    scan_id = None
+    try:
+        scan = supabase_admin.table("scans").insert({
+            "user_id":          user.id,
+            "resume_id":        body.resume_id,
+            "target_role":      body.target_role,
+            "experience_level": body.experience_level,
+            "ats_score":        result["ats_score"],
+            "keyword_score":    result.get("keyword_score"),
+            "format_score":     result.get("format_score"),
+            "content_score":    result.get("content_score"),
+            "readability_score": result.get("readability_score"),
+            "result_json":      result,
+            "optimized_resume": result.get("optimized_resume"),
+        }).execute()
+        scan_id = scan.data[0]["id"]
+        logger.info(f"Scan saved. Score: {result['ats_score']} for {body.target_role}")
+    except Exception as db_err:
+        logger.error(f"Failed to save scan to DB: {db_err}")
 
     # Increment scan count
-    supabase_admin.table("profiles").update({
-        "scans_used": profile["scans_used"] + 1
-    }).eq("id", user.id).execute()
+    try:
+        supabase_admin.table("profiles").update({
+            "scans_used": profile["scans_used"] + 1
+        }).eq("id", user.id).execute()
+    except Exception as db_err:
+        logger.warning(f"Failed to update scan count: {db_err}")
 
-    logger.info(f"Scan saved. Score: {result['ats_score']} for {body.target_role}")
-    return {"scan_id": scan.data[0]["id"], "result": result}
+    return {"scan_id": scan_id, "result": result}
 
 
 @router.get("/history")
