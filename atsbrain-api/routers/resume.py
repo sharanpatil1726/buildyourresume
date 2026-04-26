@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from middleware import get_current_user
 from database import supabase_admin
@@ -35,8 +36,8 @@ async def upload_resume(
     if len(raw_text.strip()) < 100:
         raise HTTPException(status_code=400, detail="Could not extract text from file. Try copy-pasting instead.")
 
-    # Upload to Supabase Storage
-    file_path = f"{user.id}/{file.filename}"
+    # Upload to Supabase Storage — unique path per upload to avoid 409 conflicts
+    file_path = f"{user.id}/{uuid.uuid4()}/{file.filename}"
     supabase_admin.storage.from_("resume").upload(
         file_path, content,
         file_options={"content-type": file.content_type or "application/octet-stream"}
