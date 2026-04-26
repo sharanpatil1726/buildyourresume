@@ -56,16 +56,33 @@ async def search_jobs(
         if (result.count or 0) == 0:
             await refresh_task
             result = _run_query()
+
+        # Final fallback: role title didn't match anything — show any available jobs so page isn't empty
+        role_matched = (result.count or 0) > 0
+        if not role_matched and role:
+            q = (
+                supabase_admin.table("jobs")
+                .select("*", count="exact")
+                .eq("is_active", True)
+                .order("posted_at", desc=True)
+                .range(offset, offset + page_size - 1)
+            )
+            if location and location.lower() not in ("india", ""):
+                q = q.ilike("location", f"%{location}%")
+            if source != "all":
+                q = q.eq("source", source)
+            result = q.execute()
     except Exception as e:
         logger.error(f"Jobs DB query failed: {e}")
-        return {"jobs": [], "total": 0, "page": page, "pages": 0, "from_cache": False}
+        return {"jobs": [], "total": 0, "page": page, "pages": 0, "from_cache": False, "role_matched": False}
 
     return {
-        "jobs":       result.data or [],
-        "total":      result.count or 0,
-        "page":       page,
-        "pages":      -(-(result.count or 0) // page_size),
-        "from_cache": True,
+        "jobs":         result.data or [],
+        "total":        result.count or 0,
+        "page":         page,
+        "pages":        -(-(result.count or 0) // page_size),
+        "from_cache":   True,
+        "role_matched": role_matched if role else True,
     }
 
 

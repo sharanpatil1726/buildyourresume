@@ -23,6 +23,8 @@ function formatSalary(min?: number, max?: number): string {
   return `Up to ${fmt(max!)} /yr`
 }
 
+const CITIES = ['All India', 'Bangalore', 'Hyderabad', 'Mumbai', 'Delhi', 'Pune', 'Chennai', 'Noida', 'Gurgaon']
+
 export default function Jobs() {
   const savedRole = localStorage.getItem('atsbrain_target_role') || ''
   const [role, setRole] = useState(savedRole)
@@ -33,20 +35,23 @@ export default function Jobs() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [roleMatched, setRoleMatched] = useState(true)
   const [saved, setSaved] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'search' | 'saved'>('search')
-
-  const CITIES = ['All India', 'Bangalore', 'Hyderabad', 'Mumbai', 'Delhi', 'Pune', 'Chennai', 'Noida', 'Gurgaon']
   const [savedJobs, setSavedJobs] = useState<Job[]>([])
 
-  const search = useCallback(async (p = 1) => {
+  // Accept explicit overrides to avoid stale closure issues with city chip clicks
+  const search = useCallback(async (p = 1, overrideRole?: string, overrideLocation?: string) => {
+    const r = overrideRole !== undefined ? overrideRole : role
+    const l = overrideLocation !== undefined ? overrideLocation : location
     setLoading(true); setError('')
     try {
-      const res = await api.jobs.search(role || undefined, location || undefined, p)
+      const res = await api.jobs.search(r || undefined, l || undefined, p)
       setJobs(res.jobs as unknown as Job[])
       setTotal(res.total)
       setPages(res.pages)
       setPage(p)
+      setRoleMatched(res.role_matched ?? true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load jobs')
     } finally {
@@ -76,14 +81,19 @@ export default function Jobs() {
     } catch {}
   }
 
-  const trackApply = async (job: Job) => {
-    try { await api.jobs.apply(job.id) } catch {}
-    window.open(job.apply_url, '_blank', 'noopener')
+  const trackApply = (jobId: string) => {
+    // Fire-and-forget tracking; don't block the navigation
+    api.jobs.apply(jobId).catch(() => {})
   }
 
   const switchTab = (t: 'search' | 'saved') => {
     setTab(t)
     if (t === 'saved') loadSaved()
+  }
+
+  const handleCityClick = (cityVal: string) => {
+    setLocation(cityVal)
+    search(1, undefined, cityVal) // pass explicitly to avoid stale closure
   }
 
   const displayJobs = tab === 'saved' ? savedJobs : jobs
@@ -110,7 +120,9 @@ export default function Jobs() {
       <div className="page-inner">
         <h1 className="page-title">Live Jobs</h1>
         <p className="page-sub">
-          {savedRole ? <>Showing jobs for <strong>{savedRole}</strong> · <button style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 'inherit', padding: 0 }} onClick={() => { localStorage.removeItem('atsbrain_target_role'); setRole('') }}>Clear</button></> : 'Fresher to Senior — jobs across India updated every 2 hours.'}
+          {savedRole
+            ? <>Showing jobs for <strong>{savedRole}</strong> · <button style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 'inherit', padding: 0 }} onClick={() => { localStorage.removeItem('atsbrain_target_role'); setRole(''); search(1, '') }}>Clear</button></>
+            : 'Fresher to Senior — jobs across India updated every 2 hours.'}
         </p>
 
         <div className="tabs">
@@ -133,7 +145,10 @@ export default function Jobs() {
                 style={{ maxWidth: 180 }}
                 placeholder="City (e.g. Bangalore)"
                 value={location === 'india' ? '' : location}
-                onChange={e => setLocation(e.target.value || 'india')}
+                onChange={e => {
+                  const val = e.target.value || 'india'
+                  setLocation(val)
+                }}
                 onKeyDown={e => e.key === 'Enter' && search(1)}
               />
               <button className="btn btn-primary" onClick={() => search(1)} disabled={loading}>
@@ -147,7 +162,7 @@ export default function Jobs() {
                 return (
                   <button
                     key={city}
-                    onClick={() => { setLocation(val); search(1) }}
+                    onClick={() => handleCityClick(val)}
                     style={{
                       padding: '3px 10px',
                       borderRadius: 20,
@@ -176,18 +191,31 @@ export default function Jobs() {
           </div>
         ) : (
           <>
-            {tab === 'search' && <p style={{ color: 'var(--muted)', fontSize: '.85rem', marginBottom: 12 }}>{total.toLocaleString()} jobs found</p>}
+            {tab === 'search' && (
+              <p style={{ color: 'var(--muted)', fontSize: '.85rem', marginBottom: 12 }}>
+                {total.toLocaleString()} jobs found
+                {!roleMatched && role && <span style={{ color: 'var(--warning, #f59e0b)', marginLeft: 8 }}>— no exact matches for "{role}", showing available jobs</span>}
+              </p>
+            )}
             <div className="jobs-grid">
               {displayJobs.map(job => (
                 <div key={job.id} className="job-card">
                   <div className="job-logo">{job.company?.[0]?.toUpperCase() ?? '?'}</div>
                   <div className="job-info">
-                    <div className="job-title">{job.title}</div>
-                    <div className="job-company">{job.company}</div>
-                    <div className="job-meta">
-                      {job.location && <span>📍 {job.location}</span>}
+                    <a
+                      href={job.apply_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="job-title"
+                      style={{ textDecoration: 'none', color: 'inherit' }}
+                      onClick={() => trackApply(job.id)}
+                    >{job.title}</a>
+                    <div style={{ fontWeight: 600, fontSize: '.88rem', marginTop: 2 }}>{job.company}</div>
+                    <div style={{ fontSize: '.82rem', color: 'var(--primary)', fontWeight: 500, marginTop: 3 }}>
+                      📍 {job.location || 'India'}
+                    </div>
+                    <div className="job-meta" style={{ marginTop: 4 }}>
                       {formatSalary(job.salary_min, job.salary_max) && <span>💰 {formatSalary(job.salary_min, job.salary_max)}</span>}
-                      {job.source && <span>🔗 {job.source}</span>}
                       {job.posted_at && <span>🕐 {new Date(job.posted_at).toLocaleDateString('en-IN')}</span>}
                     </div>
                     {job.description && (
@@ -202,7 +230,14 @@ export default function Jobs() {
                       onClick={() => toggleSave(job.id)}
                       title={saved.has(job.id) ? 'Unsave' : 'Save'}
                     >{saved.has(job.id) ? '★' : '☆'}</button>
-                    <button className="btn btn-primary btn-sm" onClick={() => trackApply(job)}>Apply</button>
+                    <a
+                      href={job.apply_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-primary btn-sm"
+                      style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                      onClick={() => trackApply(job.id)}
+                    >Apply →</a>
                   </div>
                 </div>
               ))}
