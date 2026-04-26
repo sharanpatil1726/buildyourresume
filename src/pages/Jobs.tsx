@@ -35,6 +35,8 @@ export default function Jobs() {
   const [error, setError] = useState('')
   const [saved, setSaved] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'search' | 'saved'>('search')
+
+  const CITIES = ['All India', 'Bangalore', 'Hyderabad', 'Mumbai', 'Delhi', 'Pune', 'Chennai', 'Noida', 'Gurgaon']
   const [savedJobs, setSavedJobs] = useState<Job[]>([])
 
   const search = useCallback(async (p = 1) => {
@@ -117,26 +119,49 @@ export default function Jobs() {
         </div>
 
         {tab === 'search' && (
-          <div className="search-bar">
-            <input
-              className="form-input"
-              placeholder="Job title, skill (e.g. React Developer)"
-              value={role}
-              onChange={e => setRole(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && search(1)}
-            />
-            <input
-              className="form-input"
-              style={{ maxWidth: 200 }}
-              placeholder="City (e.g. Bangalore)"
-              value={location}
-              onChange={e => setLocation(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && search(1)}
-            />
-            <button className="btn btn-primary" onClick={() => search(1)} disabled={loading}>
-              {loading ? 'Searching…' : 'Search'}
-            </button>
-          </div>
+          <>
+            <div className="search-bar">
+              <input
+                className="form-input"
+                placeholder="Job title, skill (e.g. React Developer)"
+                value={role}
+                onChange={e => setRole(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && search(1)}
+              />
+              <input
+                className="form-input"
+                style={{ maxWidth: 180 }}
+                placeholder="City (e.g. Bangalore)"
+                value={location === 'india' ? '' : location}
+                onChange={e => setLocation(e.target.value || 'india')}
+                onKeyDown={e => e.key === 'Enter' && search(1)}
+              />
+              <button className="btn btn-primary" onClick={() => search(1)} disabled={loading}>
+                {loading ? 'Searching…' : 'Search'}
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              {CITIES.map(city => {
+                const val = city === 'All India' ? 'india' : city
+                const isActive = location === val
+                return (
+                  <button
+                    key={city}
+                    onClick={() => { setLocation(val); search(1) }}
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: 20,
+                      border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                      background: isActive ? 'var(--primary)' : 'transparent',
+                      color: isActive ? '#fff' : 'var(--muted)',
+                      fontSize: '.78rem',
+                      cursor: 'pointer',
+                    }}
+                  >{city}</button>
+                )
+              })}
+            </div>
+          </>
         )}
 
         {error && <div className="alert alert-error">{error}</div>}

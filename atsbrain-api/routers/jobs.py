@@ -32,24 +32,30 @@ async def search_jobs(
         except Exception as e:
             logger.error(f"Background fetch error: {e}")
 
-    asyncio.create_task(bg_refresh())
+    refresh_task = asyncio.create_task(bg_refresh())
 
-    # Query DB immediately and return — response is always fast
-    try:
-        query = (
+    def _run_query():
+        q = (
             supabase_admin.table("jobs")
             .select("*", count="exact")
             .eq("is_active", True)
             .order("posted_at", desc=True)
             .range(offset, offset + page_size - 1)
         )
-        if role:     query = query.ilike("title", f"%{role}%")
-        if location and location.lower() != "india":
-            query = query.ilike("location", f"%{location}%")
+        if role:
+            q = q.ilike("title", f"%{role}%")
+        if location and location.lower() not in ("india", ""):
+            q = q.ilike("location", f"%{location}%")
         if source != "all":
-            query = query.eq("source", source)
+            q = q.eq("source", source)
+        return q.execute()
 
-        result = query.execute()
+    try:
+        result = _run_query()
+        # If DB is empty for this query, wait for the background fetch then retry once
+        if (result.count or 0) == 0:
+            await refresh_task
+            result = _run_query()
     except Exception as e:
         logger.error(f"Jobs DB query failed: {e}")
         return {"jobs": [], "total": 0, "page": page, "pages": 0, "from_cache": False}
