@@ -361,11 +361,24 @@ async def fetch_google_jobs(role: str, location: str = "India") -> list[dict]:
     return jobs
 
 
+_JOB_COLUMNS = {
+    "external_id", "source", "title", "company", "location",
+    "description", "apply_url", "is_active", "fetched_at",
+    "posted_at", "salary_min", "salary_max", "salary_currency",
+    "skills", "job_type",
+}
+
+
+def _clean(job: dict) -> dict:
+    """Strip any keys that aren't real columns to avoid 'column does not exist' errors."""
+    return {k: v for k, v in job.items() if k in _JOB_COLUMNS}
+
+
 def upsert_jobs(jobs: list[dict]) -> int:
     """Save jobs to Supabase. Updates if external_id already exists."""
     if not jobs:
         return 0
-    valid = [j for j in jobs if j.get("external_id")]
+    valid = [_clean(j) for j in jobs if j.get("external_id")]
     if not valid:
         return 0
     try:
@@ -373,14 +386,17 @@ def upsert_jobs(jobs: list[dict]) -> int:
         logger.info(f"Upserted {len(valid)} jobs")
         return len(valid)
     except Exception as e:
-        logger.error(f"Upsert failed (likely missing UNIQUE constraint on external_id): {e}")
-        # Fallback: plain insert so jobs still appear; runs until constraint is added
+        logger.error(f"Upsert failed: {e}")
+        # Retry with only the columns confirmed to exist from the manual insert
+        core_cols = {"external_id", "source", "title", "company", "location",
+                     "description", "apply_url", "is_active", "fetched_at", "posted_at"}
+        minimal = [{k: v for k, v in j.items() if k in core_cols} for j in valid]
         try:
-            supabase_admin.table("jobs").insert(valid).execute()
-            logger.info(f"Inserted {len(valid)} jobs via fallback insert")
-            return len(valid)
+            supabase_admin.table("jobs").upsert(minimal, on_conflict="external_id").execute()
+            logger.info(f"Upserted {len(minimal)} jobs (minimal columns)")
+            return len(minimal)
         except Exception as e2:
-            logger.error(f"Insert also failed: {e2}")
+            logger.error(f"Minimal upsert also failed: {e2}")
             return 0
 
 
