@@ -157,6 +157,14 @@ export default function Jobs() {
               <button className="btn btn-primary" onClick={() => search(1)} disabled={loading}>
                 {loading ? 'Searching...' : 'Search'}
               </button>
+              <button
+                className="btn btn-outline"
+                onClick={seedJobs}
+                disabled={loading}
+                title="Fetch latest jobs from job boards"
+              >
+                {loading ? 'Loading...' : 'Fetch Jobs'}
+              </button>
             </div>
 
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>

@@ -186,7 +186,7 @@ async def fetch_adzuna_jobs(role: str, location: str = "india", page: int = 1) -
         "content-type":     "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=8) as client:
+    async with httpx.AsyncClient(timeout=5) as client:
         try:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
@@ -209,7 +209,7 @@ async def fetch_adzuna_jobs(role: str, location: str = "india", page: int = 1) -
             "salary_max":      int(j["salary_max"]) if j.get("salary_max") else None,
             "salary_currency": "INR",
             "description":     j.get("description", ""),
-            "skills":          extract_skills_hybrid(text, job_title),
+            "skills":          extract_skills_static(text),
             "apply_url":       j.get("redirect_url", ""),
             "job_type":        j.get("contract_time", "full-time"),
             "posted_at":       j.get("created"),
@@ -226,7 +226,7 @@ async def fetch_remotive_jobs(role: str = "") -> list[dict]:
     categories = ["software-dev", "devops-sysadmin", "data", "backend"]
     all_jobs = []
 
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with httpx.AsyncClient(timeout=6) as client:
         for category in categories[:2]:
             try:
                 params: dict = {"category": category, "limit": 50}
