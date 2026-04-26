@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from middleware import get_current_user
 from database import supabase_admin
 from services.jobs_service import (
-    fetch_adzuna_jobs, upsert_jobs, has_fresh_cache,
+    fetch_adzuna_jobs, fetch_remotive_jobs, upsert_jobs, has_fresh_cache,
 )
 import asyncio
 from loguru import logger
@@ -48,6 +48,8 @@ async def search_jobs(
             return
         try:
             jobs = await fetch_adzuna_jobs(search_role, location)
+            if not jobs:
+                jobs = await fetch_remotive_jobs(search_role)
             upsert_jobs(jobs)
         except Exception as e:
             logger.error(f"Background fetch error: {e}")

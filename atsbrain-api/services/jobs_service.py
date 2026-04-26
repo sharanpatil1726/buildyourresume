@@ -221,6 +221,49 @@ async def fetch_adzuna_jobs(role: str, location: str = "india", page: int = 1) -
     return jobs
 
 
+async def fetch_remotive_jobs(role: str = "") -> list[dict]:
+    """Fetch remote tech jobs from Remotive (free, no credentials needed)."""
+    categories = ["software-dev", "devops-sysadmin", "data", "backend"]
+    all_jobs = []
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        for category in categories[:2]:
+            try:
+                params: dict = {"category": category, "limit": 50}
+                if role:
+                    params["search"] = role
+                resp = await client.get("https://remotive.com/api/remote-jobs", params=params)
+                resp.raise_for_status()
+                data = resp.json()
+
+                for j in data.get("jobs", []):
+                    desc_html = j.get("description", "")
+                    desc = re.sub(r"<[^>]+>", " ", desc_html)[:2000].strip()
+                    title = j.get("title", "").strip()
+                    all_jobs.append({
+                        "external_id":     f"remotive_{j['id']}",
+                        "source":          "remotive",
+                        "title":           title,
+                        "company":         j.get("company_name", ""),
+                        "location":        j.get("candidate_required_location") or "Remote",
+                        "salary_min":      None,
+                        "salary_max":      None,
+                        "salary_currency": "USD",
+                        "description":     desc,
+                        "skills":          extract_skills_static(f"{title} {desc}"),
+                        "apply_url":       j.get("url", ""),
+                        "job_type":        j.get("job_type", "full_time").replace("_", " "),
+                        "posted_at":       j.get("publication_date"),
+                        "fetched_at":      datetime.now(timezone.utc).isoformat(),
+                        "is_active":       True,
+                    })
+            except Exception as e:
+                logger.warning(f"Remotive fetch error ({category}): {e}")
+
+    logger.info(f"Remotive: fetched {len(all_jobs)} jobs for '{role}'")
+    return all_jobs
+
+
 async def fetch_linkedin_jobs(role: str, location: str = "India") -> list[dict]:
     """Fetch LinkedIn jobs via RapidAPI."""
     if not settings.rapidapi_key:

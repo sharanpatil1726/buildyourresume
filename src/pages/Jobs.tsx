@@ -40,11 +40,11 @@ export default function Jobs() {
   const [tab, setTab] = useState<'search' | 'saved'>('search')
   const [savedJobs, setSavedJobs] = useState<Job[]>([])
 
-  // Accept explicit overrides to avoid stale closure issues with city chip clicks
   const search = useCallback(async (p = 1, overrideRole?: string, overrideLocation?: string) => {
     const r = overrideRole !== undefined ? overrideRole : role
     const l = overrideLocation !== undefined ? overrideLocation : location
-    setLoading(true); setError('')
+    setLoading(true)
+    setError('')
     try {
       const res = await api.jobs.search(r || undefined, l || undefined, p)
       setJobs(res.jobs as unknown as Job[])
@@ -59,7 +59,7 @@ export default function Jobs() {
     }
   }, [role, location])
 
-  useEffect(() => { search(1) }, []) // auto-search on mount — uses savedRole if present
+  useEffect(() => { search(1) }, [])
 
   const loadSaved = async () => {
     try {
@@ -82,7 +82,6 @@ export default function Jobs() {
   }
 
   const trackApply = (jobId: string) => {
-    // Fire-and-forget tracking; don't block the navigation
     api.jobs.apply(jobId).catch(() => {})
   }
 
@@ -93,27 +92,10 @@ export default function Jobs() {
 
   const handleCityClick = (cityVal: string) => {
     setLocation(cityVal)
-    search(1, undefined, cityVal) // pass explicitly to avoid stale closure
+    search(1, undefined, cityVal)
   }
 
   const displayJobs = tab === 'saved' ? savedJobs : jobs
-
-  if (!savedRole && jobs.length === 0 && !loading) {
-    return (
-      <div className="page">
-        <div className="page-inner" style={{ maxWidth: 560 }}>
-          <div className="empty" style={{ marginTop: 60 }}>
-            <div className="empty-icon">💼</div>
-            <h3>Scan your resume first</h3>
-            <p style={{ marginBottom: 20 }}>
-              We'll match live jobs to your target role automatically after you analyze your resume.
-            </p>
-            <a href="/analyze" className="btn btn-primary">Analyze Resume →</a>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="page">
@@ -121,7 +103,13 @@ export default function Jobs() {
         <h1 className="page-title">Live Jobs</h1>
         <p className="page-sub">
           {savedRole
-            ? <>Showing jobs for <strong>{savedRole}</strong> · <button style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 'inherit', padding: 0 }} onClick={() => { localStorage.removeItem('atsbrain_target_role'); setRole(''); search(1, '') }}>Clear</button></>
+            ? <>
+                Showing jobs for <strong>{savedRole}</strong>
+                <button
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 'inherit', padding: '0 0 0 8px' }}
+                  onClick={() => { localStorage.removeItem('atsbrain_target_role'); setRole(''); search(1, '') }}
+                >Clear</button>
+              </>
             : 'Fresher to Senior — jobs across India updated every 2 hours.'}
         </p>
 
@@ -135,7 +123,7 @@ export default function Jobs() {
             <div className="search-bar">
               <input
                 className="form-input"
-                placeholder="Job title, skill (e.g. React Developer)"
+                placeholder="Job title or skill (e.g. React Developer)"
                 value={role}
                 onChange={e => setRole(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && search(1)}
@@ -152,9 +140,10 @@ export default function Jobs() {
                 onKeyDown={e => e.key === 'Enter' && search(1)}
               />
               <button className="btn btn-primary" onClick={() => search(1)} disabled={loading}>
-                {loading ? 'Searching…' : 'Search'}
+                {loading ? 'Searching...' : 'Search'}
               </button>
             </div>
+
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
               {CITIES.map(city => {
                 const val = city === 'All India' ? 'india' : city
@@ -185,18 +174,35 @@ export default function Jobs() {
           <div className="loader-wrap"><div className="loader" /></div>
         ) : displayJobs.length === 0 ? (
           <div className="empty">
-            <div className="empty-icon">💼</div>
-            <h3>{tab === 'saved' ? 'No saved jobs' : 'No jobs found'}</h3>
-            <p>{tab === 'saved' ? 'Save jobs from search to view them here.' : 'Try a different role or location.'}</p>
+            <h3 style={{ marginBottom: 8 }}>
+              {tab === 'saved' ? 'No saved jobs' : 'No jobs found'}
+            </h3>
+            <p style={{ color: 'var(--muted)', fontSize: '.9rem' }}>
+              {tab === 'saved'
+                ? 'Save jobs from the search tab to view them here.'
+                : !savedRole
+                  ? 'Analyze your resume first to see role-matched jobs, or search for any title above.'
+                  : 'Try a different role or location.'}
+            </p>
+            {tab === 'search' && !savedRole && (
+              <a href="/analyze" className="btn btn-primary" style={{ marginTop: 16, display: 'inline-block' }}>
+                Analyze Resume
+              </a>
+            )}
           </div>
         ) : (
           <>
             {tab === 'search' && (
               <p style={{ color: 'var(--muted)', fontSize: '.85rem', marginBottom: 12 }}>
                 {total.toLocaleString()} jobs found
-                {!roleMatched && role && <span style={{ color: 'var(--warning, #f59e0b)', marginLeft: 8 }}>— no exact matches for "{role}", showing available jobs</span>}
+                {!roleMatched && role && (
+                  <span style={{ color: 'var(--warning, #f59e0b)', marginLeft: 8 }}>
+                    — no exact matches for &ldquo;{role}&rdquo;, showing available jobs
+                  </span>
+                )}
               </p>
             )}
+
             <div className="jobs-grid">
               {displayJobs.map(job => (
                 <div key={job.id} className="job-card">
@@ -212,14 +218,26 @@ export default function Jobs() {
                     >{job.title}</a>
                     <div style={{ fontWeight: 600, fontSize: '.88rem', marginTop: 2 }}>{job.company}</div>
                     <div style={{ fontSize: '.82rem', color: 'var(--primary)', fontWeight: 500, marginTop: 3 }}>
-                      📍 {job.location || 'India'}
+                      {job.location || 'India'}
                     </div>
                     <div className="job-meta" style={{ marginTop: 4 }}>
-                      {formatSalary(job.salary_min, job.salary_max) && <span>💰 {formatSalary(job.salary_min, job.salary_max)}</span>}
-                      {job.posted_at && <span>🕐 {new Date(job.posted_at).toLocaleDateString('en-IN')}</span>}
+                      {formatSalary(job.salary_min, job.salary_max) && (
+                        <span>{formatSalary(job.salary_min, job.salary_max)}</span>
+                      )}
+                      {job.posted_at && (
+                        <span>{new Date(job.posted_at).toLocaleDateString('en-IN')}</span>
+                      )}
                     </div>
                     {job.description && (
-                      <p style={{ fontSize: '.82rem', color: 'var(--muted)', marginTop: 6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <p style={{
+                        fontSize: '.82rem',
+                        color: 'var(--muted)',
+                        marginTop: 6,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}>
                         {job.description}
                       </p>
                     )}
@@ -229,7 +247,7 @@ export default function Jobs() {
                       className={`btn btn-sm ${saved.has(job.id) ? 'btn-primary' : 'btn-outline'}`}
                       onClick={() => toggleSave(job.id)}
                       title={saved.has(job.id) ? 'Unsave' : 'Save'}
-                    >{saved.has(job.id) ? '★' : '☆'}</button>
+                    >{saved.has(job.id) ? 'Saved' : 'Save'}</button>
                     <a
                       href={job.apply_url}
                       target="_blank"
@@ -237,7 +255,7 @@ export default function Jobs() {
                       className="btn btn-primary btn-sm"
                       style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
                       onClick={() => trackApply(job.id)}
-                    >Apply →</a>
+                    >Apply</a>
                   </div>
                 </div>
               ))}

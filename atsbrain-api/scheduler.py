@@ -5,7 +5,7 @@ from loguru import logger
 from database import supabase_admin
 from services.jobs_service import (
     fetch_adzuna_jobs, fetch_linkedin_jobs,
-    fetch_google_jobs, upsert_jobs
+    fetch_google_jobs, fetch_remotive_jobs, upsert_jobs
 )
 from datetime import datetime, timedelta, timezone
 
@@ -32,7 +32,8 @@ LOCATIONS = ["bangalore", "hyderabad", "mumbai", "delhi", "chennai", "pune"]
 
 async def refresh_jobs():
     """Fetch fresh jobs from all APIs for all roles."""
-    logger.info("⏰ Cron: Starting job refresh...")
+    import asyncio
+    logger.info("Cron: Starting job refresh...")
     total = 0
 
     for role in CRON_ROLES:
@@ -41,12 +42,18 @@ async def refresh_jobs():
                 jobs = await fetch_adzuna_jobs(role, location)
                 saved = upsert_jobs(jobs)
                 total += saved
-
-                # Rate limiting — don't hammer the API
-                import asyncio
                 await asyncio.sleep(0.5)
             except Exception as e:
                 logger.error(f"Cron error for {role}/{location}: {e}")
+
+    # Remotive fallback if Adzuna produced nothing (e.g., credentials not set)
+    if total == 0:
+        try:
+            for role in CRON_ROLES[:4]:
+                jobs = await fetch_remotive_jobs(role)
+                total += upsert_jobs(jobs)
+        except Exception as e:
+            logger.error(f"Remotive cron error: {e}")
 
     # Mark jobs older than 30 days as inactive
     cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
