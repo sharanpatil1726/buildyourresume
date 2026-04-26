@@ -10,27 +10,6 @@ from loguru import logger
 router = APIRouter()
 
 
-def _build_job_query(offset: int, page_size: int, role: str = "", location: str = "india",
-                     source: str = "all", active_only: bool = False):
-    q = (
-        supabase_admin.table("jobs")
-        .select("*", count="exact")
-        .order("posted_at", desc=True)
-        .range(offset, offset + page_size - 1)
-    )
-    if active_only:
-        # or_() includes both is_active=true AND is_active IS NULL
-        # neq("is_active", False) excludes NULL rows in PostgreSQL, so we use or_ instead
-        q = q.or_("is_active.eq.true,is_active.is.null")
-    if role:
-        q = q.ilike("title", f"%{role}%")
-    if location and location.lower() not in ("india", ""):
-        q = q.ilike("location", f"%{location}%")
-    if source != "all":
-        q = q.eq("source", source)
-    return q
-
-
 @router.get("/")
 async def search_jobs(
     role:      str = Query("", description="Job title or skill"),
@@ -56,54 +35,78 @@ async def search_jobs(
 
     refresh_task = asyncio.create_task(bg_refresh())
 
-    def safe_query(*args, **kwargs):
+    def run_query(r: str = "", loc: str = "india", active_only: bool = False):
+        """Returns (data, count) or ([], None) on error."""
         try:
-            return _build_job_query(*args, **kwargs).execute()
+            q = supabase_admin.table("jobs").select("*", count="exact")
+            if active_only:
+                q = q.or_("is_active.eq.true,is_active.is.null")
+            if r:
+                q = q.ilike("title", f"%{r}%")
+            if loc and loc.lower() not in ("india", ""):
+                q = q.ilike("location", f"%{loc}%")
+            if source != "all":
+                q = q.eq("source", source)
+            q = q.order("posted_at", desc=True).range(offset, offset + page_size - 1)
+            res = q.execute()
+            return res.data or [], res.count
         except Exception as e:
-            logger.warning(f"Query failed ({args}, {kwargs}): {e}")
-            return None
+            logger.warning(f"Query failed r={r!r} loc={loc!r} active={active_only}: {e}")
+            return [], None
 
     # Level 1: role + active filter
-    result = safe_query(offset, page_size, role, location, source, active_only=True)
+    data, count = run_query(role, location, active_only=True)
 
-    # Level 2: wait for fresh fetch, retry same query
-    if result is None or (result.count or 0) == 0:
+    # Level 2: wait for background fetch, retry
+    if not data:
         try:
             await refresh_task
         except Exception:
             pass
-        result = safe_query(offset, page_size, role, location, source, active_only=True)
+        data, count = run_query(role, location, active_only=True)
 
-    # Level 3: drop role filter, keep active filter
-    if result is None or (result.count or 0) == 0:
-        result = safe_query(offset, page_size, "", location, source, active_only=True)
+    # Level 3: drop role filter
+    if not data:
+        data, count = run_query("", location, active_only=True)
 
-    # Level 4: drop is_active filter entirely — catches any NULL/missing column issues
-    if result is None or (result.count or 0) == 0:
-        result = safe_query(offset, page_size, "", location, source, active_only=False)
+    # Level 4: drop is_active filter (handles NULL values)
+    if not data:
+        data, count = run_query("", location, active_only=False)
 
-    # Level 5: drop location filter too (any job in DB)
-    if result is None or (result.count or 0) == 0:
-        result = safe_query(offset, page_size, "", "india", source, active_only=False)
+    # Level 5: drop everything — return any job in DB
+    if not data:
+        data, count = run_query("", "india", active_only=False)
 
-    if result is None:
-        logger.error("All query levels failed — DB unreachable")
-        return {"jobs": [], "total": 0, "page": page, "pages": 0, "from_cache": False, "role_matched": False}
+    if not data:
+        logger.warning("Jobs DB returned empty with all filters dropped")
 
-    role_matched = bool(role) and (result.count or 0) > 0 and role.lower() in str(result.data or "").lower()
+    total = count or len(data)
+    role_matched = bool(role) and bool(data) and role.lower() in str(data).lower()
 
-    if (result.count or 0) == 0:
-        logger.warning("Jobs DB returned 0 results even with no filters — DB may be empty")
-
-    total = result.count or 0
     return {
-        "jobs":         result.data or [],
+        "jobs":         data,
         "total":        total,
         "page":         page,
-        "pages":        -(-(total) // page_size) if total else 0,
+        "pages":        -(-total // page_size) if total else 0,
         "from_cache":   True,
         "role_matched": role_matched if role else True,
     }
+
+
+@router.get("/status")
+async def jobs_status():
+    """Public endpoint — returns DB job counts to verify the backend can read the jobs table."""
+    try:
+        total = supabase_admin.table("jobs").select("id", count="exact").execute()
+        active = supabase_admin.table("jobs").select("id", count="exact").eq("is_active", True).execute()
+        sample = supabase_admin.table("jobs").select("id, title, source, is_active").limit(3).execute()
+        return {
+            "total_in_db":   total.count,
+            "is_active_true": active.count,
+            "sample":        sample.data,
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @router.get("/debug")
