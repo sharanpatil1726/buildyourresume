@@ -9,8 +9,8 @@ router = APIRouter()
 
 @router.post("/signup")
 async def signup(body: SignupRequest):
-    supabase = get_supabase()
     try:
+        supabase = get_supabase()
         resp = supabase.auth.sign_up({
             "email":    body.email,
             "password": body.password,
@@ -26,8 +26,8 @@ async def signup(body: SignupRequest):
 
 @router.post("/login")
 async def login(body: LoginRequest):
-    supabase = get_supabase()
     try:
+        supabase = get_supabase()
         resp = supabase.auth.sign_in_with_password({
             "email":    body.email,
             "password": body.password,
