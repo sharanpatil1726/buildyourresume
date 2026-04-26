@@ -5,10 +5,10 @@ pydantic==2.7.4
 pydantic-settings==2.3.4
 
 # Supabase
-supabase==2.9.1
+supabase==2.15.2
 
 # Anthropic Claude
-anthropic==0.49.0
+anthropic==0.97.0
 
 # Job APIs
 httpx==0.27.0
@@ -28,4 +28,3 @@ apscheduler==3.10.4
 python-dotenv==1.0.1
 loguru==0.7.2
 starlette==0.37.2
-setuptools>=69.0.0
