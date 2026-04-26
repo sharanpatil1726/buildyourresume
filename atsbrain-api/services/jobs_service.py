@@ -110,13 +110,10 @@ def store_discovered_skill(skill: str) -> bool:
     """Store a newly discovered skill in the database."""
     if not skill or len(skill.strip()) < 2:
         return False
-    
     try:
-        supabase_admin.table("discovered_skills").upsert({
+        supabase_admin.table("discovered_skills").insert({
             "skill": skill.strip(),
-            "discovered_at": datetime.now(timezone.utc).isoformat(),
-            "frequency": 1
-        }, on_conflict="skill").execute()
+        }).execute()
         return True
     except Exception as e:
         logger.warning(f"Failed to store discovered skill '{skill}': {e}")

@@ -22,14 +22,19 @@ async def search_jobs(
 ):
     offset = (page - 1) * page_size
 
-    # Check cache — all external fetches happen in background so the response is instant
     cache_hit = has_fresh_cache(role, location) if role else False
 
     if not cache_hit:
+        # Await Adzuna so the DB has data before we query it
+        try:
+            adzuna_jobs = await fetch_adzuna_jobs(role or "software engineer", location)
+            upsert_jobs(adzuna_jobs)
+        except Exception as e:
+            logger.error(f"Adzuna fetch error: {e}")
+
+        # LinkedIn + Google run in background (optional sources)
         async def bg_fetch():
             try:
-                adzuna_jobs = await fetch_adzuna_jobs(role or "software engineer", location)
-                upsert_jobs(adzuna_jobs)
                 li_jobs = await fetch_linkedin_jobs(role or "software engineer", location)
                 upsert_jobs(li_jobs)
                 g_jobs = await fetch_google_jobs(role or "software engineer", location)
