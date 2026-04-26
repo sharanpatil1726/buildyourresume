@@ -98,6 +98,7 @@ export default function Analyze() {
       setResult(res.result)
       setScanId(res.scan_id)
       setIsUnlocked(res.is_unlocked)
+      localStorage.setItem('atsbrain_target_role', targetRole)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Analysis failed. Please try again.')
     } finally {

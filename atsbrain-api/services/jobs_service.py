@@ -186,7 +186,7 @@ async def fetch_adzuna_jobs(role: str, location: str = "india", page: int = 1) -
         "content-type":     "application/json",
     }
 
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with httpx.AsyncClient(timeout=8) as client:
         try:
             resp = await client.get(url, params=params)
             resp.raise_for_status()

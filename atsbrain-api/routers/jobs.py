@@ -24,25 +24,31 @@ async def search_jobs(
 
     cache_hit = has_fresh_cache(role, location) if role else True
 
-    if not cache_hit:
-        # Await Adzuna so the DB has data before we query it
+    async def bg_fetch_all(search_role: str):
         try:
-            adzuna_jobs = await fetch_adzuna_jobs(role or "software engineer", location)
-            upsert_jobs(adzuna_jobs)
+            jobs = await fetch_adzuna_jobs(search_role, location)
+            upsert_jobs(jobs)
+            li = await fetch_linkedin_jobs(search_role, location)
+            upsert_jobs(li)
+            g = await fetch_google_jobs(search_role, location)
+            upsert_jobs(g)
         except Exception as e:
-            logger.error(f"Adzuna fetch error: {e}")
+            logger.error(f"Background fetch error: {e}")
 
-        # LinkedIn + Google run in background (optional sources)
-        async def bg_fetch():
+    if not cache_hit:
+        search_role = role or "software engineer"
+        # Check if DB has any jobs at all
+        any_jobs = supabase_admin.table("jobs").select("id", count="exact").eq("is_active", True).execute()
+        if (any_jobs.count or 0) == 0:
+            # DB is empty — must await so user sees something
             try:
-                li_jobs = await fetch_linkedin_jobs(role or "software engineer", location)
-                upsert_jobs(li_jobs)
-                g_jobs = await fetch_google_jobs(role or "software engineer", location)
-                upsert_jobs(g_jobs)
+                adzuna_jobs = await fetch_adzuna_jobs(search_role, location)
+                upsert_jobs(adzuna_jobs)
             except Exception as e:
-                logger.error(f"Background fetch error: {e}")
-
-        asyncio.create_task(bg_fetch())
+                logger.error(f"Adzuna fetch error: {e}")
+        else:
+            # DB has jobs — return them instantly, refresh in background
+            asyncio.create_task(bg_fetch_all(search_role))
 
     # Query Supabase immediately — don't wait for external APIs
     try:

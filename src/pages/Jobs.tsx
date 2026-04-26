@@ -24,7 +24,8 @@ function formatSalary(min?: number, max?: number): string {
 }
 
 export default function Jobs() {
-  const [role, setRole] = useState('')
+  const savedRole = localStorage.getItem('atsbrain_target_role') || ''
+  const [role, setRole] = useState(savedRole)
   const [location, setLocation] = useState('india')
   const [jobs, setJobs] = useState<Job[]>([])
   const [total, setTotal] = useState(0)
@@ -51,7 +52,7 @@ export default function Jobs() {
     }
   }, [role, location])
 
-  useEffect(() => { search(1) }, []) // load recent jobs from DB on mount
+  useEffect(() => { search(1) }, []) // auto-search on mount — uses savedRole if present
 
   const loadSaved = async () => {
     try {
@@ -85,11 +86,30 @@ export default function Jobs() {
 
   const displayJobs = tab === 'saved' ? savedJobs : jobs
 
+  if (!savedRole && jobs.length === 0 && !loading) {
+    return (
+      <div className="page">
+        <div className="page-inner" style={{ maxWidth: 560 }}>
+          <div className="empty" style={{ marginTop: 60 }}>
+            <div className="empty-icon">💼</div>
+            <h3>Scan your resume first</h3>
+            <p style={{ marginBottom: 20 }}>
+              We'll match live jobs to your target role automatically after you analyze your resume.
+            </p>
+            <a href="/analyze" className="btn btn-primary">Analyze Resume →</a>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="page">
       <div className="page-inner">
         <h1 className="page-title">Live Jobs</h1>
-        <p className="page-sub">Fresher to Senior — jobs across India updated every 2 hours.</p>
+        <p className="page-sub">
+          {savedRole ? <>Showing jobs for <strong>{savedRole}</strong> · <button style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 'inherit', padding: 0 }} onClick={() => { localStorage.removeItem('atsbrain_target_role'); setRole('') }}>Clear</button></> : 'Fresher to Senior — jobs across India updated every 2 hours.'}
+        </p>
 
         <div className="tabs">
           <button className={`tab-btn ${tab === 'search' ? 'active' : ''}`} onClick={() => switchTab('search')}>Search Jobs</button>
