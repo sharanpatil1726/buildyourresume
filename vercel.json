@@ -1,39 +1,9 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "atsbrain-frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.py"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
+  "rewrites": [
+    { "source": "/((?!api).*)", "destination": "/index.html" }
   ],
   "crons": [
-    {
-      "path": "/api/cron/refresh-jobs",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/job-alerts",
-      "schedule": "30 2 * * *"
-    }
+    { "path": "/api/cron/refresh-jobs", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/job-alerts",   "schedule": "30 2 * * *" }
   ]
 }
