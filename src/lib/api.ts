@@ -69,8 +69,9 @@ export const api = {
       if (role) q.set('role', role)
       if (location) q.set('location', location)
       if (page && page > 1) q.set('page', String(page))
-      return req<{ jobs: Record<string, unknown>[]; total: number; pages: number; from_cache: boolean; role_matched: boolean }>('GET', `/jobs/?${q}`)
+      return req<{ jobs: Record<string, unknown>[]; total: number; pages: number; from_cache: boolean; role_matched: boolean; seeding: boolean }>('GET', `/jobs/?${q}`)
     },
+    refresh: () => req<{ fetched: number; inserted: number; source: string; error?: string }>('POST', '/jobs/refresh'),
     save: (id: string) => req<{ saved: boolean }>('POST', `/jobs/${id}/save`),
     saved: () => req<Record<string, unknown>[]>('GET', '/jobs/saved'),
     apply: (id: string) => req<{ apply_url: string; tracked: boolean }>('POST', `/jobs/${id}/apply`),

@@ -34,6 +34,7 @@ export default function Jobs() {
   const [pages, setPages] = useState(1)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [seeding, setSeeding] = useState(false)
   const [error, setError] = useState('')
   const [roleMatched, setRoleMatched] = useState(true)
   const [saved, setSaved] = useState<Set<string>>(new Set())
@@ -52,6 +53,7 @@ export default function Jobs() {
       setPages(res.pages)
       setPage(p)
       setRoleMatched(res.role_matched ?? true)
+      setSeeding(res.seeding ?? false)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load jobs')
     } finally {
@@ -83,6 +85,19 @@ export default function Jobs() {
 
   const trackApply = (jobId: string) => {
     api.jobs.apply(jobId).catch(() => {})
+  }
+
+  const seedJobs = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      await api.jobs.refresh()
+      await search(1)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load jobs')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const switchTab = (t: 'search' | 'saved') => {
@@ -180,11 +195,18 @@ export default function Jobs() {
             <p style={{ color: 'var(--muted)', fontSize: '.9rem' }}>
               {tab === 'saved'
                 ? 'Save jobs from the search tab to view them here.'
-                : !savedRole
-                  ? 'Analyze your resume first to see role-matched jobs, or search for any title above.'
-                  : 'Try a different role or location.'}
+                : seeding
+                  ? 'Job database is being populated for the first time. Click below to load jobs now.'
+                  : !savedRole
+                    ? 'Analyze your resume first to see role-matched jobs, or search for any title above.'
+                    : 'Try a different role or location.'}
             </p>
-            {tab === 'search' && !savedRole && (
+            {tab === 'search' && seeding && (
+              <button className="btn btn-primary" style={{ marginTop: 16 }} onClick={seedJobs}>
+                Load Jobs Now
+              </button>
+            )}
+            {tab === 'search' && !seeding && !savedRole && (
               <a href="/analyze" className="btn btn-primary" style={{ marginTop: 16, display: 'inline-block' }}>
                 Analyze Resume
               </a>

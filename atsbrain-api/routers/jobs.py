@@ -22,6 +22,7 @@ async def search_jobs(
     offset = (page - 1) * page_size
     search_role = role or "software engineer"
 
+    # Fire-and-forget: never block the response on external API calls
     async def bg_refresh():
         if has_fresh_cache(search_role, location):
             return
@@ -33,7 +34,7 @@ async def search_jobs(
         except Exception as e:
             logger.error(f"Background fetch error: {e}")
 
-    refresh_task = asyncio.create_task(bg_refresh())
+    asyncio.create_task(bg_refresh())
 
     def run_query(r: str = "", loc: str = "india", active_only: bool = False):
         """Returns (data, count) or ([], None) on error."""
@@ -54,31 +55,17 @@ async def search_jobs(
             logger.warning(f"Query failed r={r!r} loc={loc!r} active={active_only}: {e}")
             return [], None
 
-    # Level 1: role + active filter
+    # Cascade fallback levels — all fast DB reads, no waiting on external APIs
     data, count = run_query(role, location, active_only=True)
-
-    # Level 2: wait for background fetch, retry
-    if not data:
-        try:
-            await refresh_task
-        except Exception:
-            pass
-        data, count = run_query(role, location, active_only=True)
-
-    # Level 3: drop role filter
     if not data:
         data, count = run_query("", location, active_only=True)
-
-    # Level 4: drop is_active filter (handles NULL values)
     if not data:
         data, count = run_query("", location, active_only=False)
-
-    # Level 5: drop everything — return any job in DB
     if not data:
         data, count = run_query("", "india", active_only=False)
 
     if not data:
-        logger.warning("Jobs DB returned empty with all filters dropped")
+        logger.warning("Jobs DB is empty — background fetch is running, try again in 30s")
 
     total = count or len(data)
     role_matched = bool(role) and bool(data) and role.lower() in str(data).lower()
@@ -90,7 +77,23 @@ async def search_jobs(
         "pages":        -(-total // page_size) if total else 0,
         "from_cache":   True,
         "role_matched": role_matched if role else True,
+        "seeding":      not bool(data),  # tells frontend DB is being populated
     }
+
+
+@router.post("/refresh")
+async def refresh_jobs_now(user=Depends(get_current_user)):
+    """Manually fetch and insert jobs. Call once to seed an empty DB."""
+    try:
+        jobs = await fetch_adzuna_jobs("software engineer", "india")
+        if not jobs:
+            logger.info("Adzuna returned 0 jobs, falling back to Remotive")
+            jobs = await fetch_remotive_jobs()
+        inserted = upsert_jobs(jobs)
+        return {"fetched": len(jobs), "inserted": inserted, "source": "adzuna" if jobs else "remotive"}
+    except Exception as e:
+        logger.error(f"Manual refresh failed: {e}")
+        return {"error": str(e), "fetched": 0, "inserted": 0}
 
 
 @router.get("/status")
