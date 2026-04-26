@@ -365,15 +365,23 @@ def upsert_jobs(jobs: list[dict]) -> int:
     """Save jobs to Supabase. Updates if external_id already exists."""
     if not jobs:
         return 0
-    # Filter out jobs with no apply_url
     valid = [j for j in jobs if j.get("apply_url")]
     if not valid:
         return 0
-    supabase_admin.table("jobs").upsert(
-        valid,
-        on_conflict="external_id"
-    ).execute()
-    return len(valid)
+    try:
+        supabase_admin.table("jobs").upsert(valid, on_conflict="external_id").execute()
+        logger.info(f"Upserted {len(valid)} jobs")
+        return len(valid)
+    except Exception as e:
+        logger.error(f"Upsert failed (likely missing UNIQUE constraint on external_id): {e}")
+        # Fallback: plain insert so jobs still appear; runs until constraint is added
+        try:
+            supabase_admin.table("jobs").insert(valid).execute()
+            logger.info(f"Inserted {len(valid)} jobs via fallback insert")
+            return len(valid)
+        except Exception as e2:
+            logger.error(f"Insert also failed: {e2}")
+            return 0
 
 
 def has_fresh_cache(role: str, location: str) -> bool:
