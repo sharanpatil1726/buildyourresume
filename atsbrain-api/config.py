@@ -49,15 +49,17 @@ def get_settings() -> Settings:
 PLANS = {
     "pro": {
         "name": "Pro",
-        "amount": 74900,           # ₹749 in paise
+        "amount": 74900,
         "duration_days": 30,
         "scans_limit": 9999,
     },
     "career": {
         "name": "Career+",
-        "amount": 139900,          # ₹1399 in paise
+        "amount": 139900,
         "duration_days": 30,
         "scans_limit": 9999,
     },
 }
+
+SCAN_UNLOCK_AMOUNT = 4900  # ₹49 per scan unlock
 

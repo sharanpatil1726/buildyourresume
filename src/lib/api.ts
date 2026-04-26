@@ -50,11 +50,17 @@ export const api = {
 
   analyze: {
     run: (data: { resume_text: string; target_role: string; experience_level: string; resume_id?: string }) =>
-      req<{ scan_id: string; result: Record<string, unknown> }>('POST', '/analyze/', data),
-    history: () => req<{ id: string; target_role: string; ats_score: number; experience_level: string; created_at: string }[]>('GET', '/analyze/history'),
-    get: (id: string) => req<Record<string, unknown>>('GET', `/analyze/${id}`),
+      req<{ scan_id: string; is_unlocked: boolean; result: Record<string, unknown> }>('POST', '/analyze/', data),
+    history: () => req<{ id: string; target_role: string; ats_score: number; experience_level: string; created_at: string; is_unlocked: boolean }[]>('GET', '/analyze/history'),
+    get: (id: string) => req<{ scan_id: string; is_unlocked: boolean; target_role: string; experience_level: string; created_at: string; result: Record<string, unknown> }>('GET', `/analyze/${id}`),
     coverLetter: (data: { resume_text: string; target_role: string; company: string }) =>
       req<{ letter: string }>('POST', '/analyze/cover-letter', data),
+    createUnlockOrder: (scanId: string) =>
+      req<{ order_id: string; amount: number; currency: string; key_id: string }>('POST', `/analyze/${scanId}/unlock`),
+    verifyUnlock: (scanId: string, data: Record<string, string>) =>
+      req<{ is_unlocked: boolean; result: Record<string, unknown> }>('POST', `/analyze/${scanId}/unlock-verify`, data),
+    getOptimized: (scanId: string) =>
+      req<{ text: string }>('GET', `/analyze/${scanId}/optimized`),
   },
 
   jobs: {
@@ -83,5 +89,11 @@ export const api = {
       req<{ order_id: string; amount: number; currency: string; plan_name: string; key_id: string }>('POST', '/payment/create-order', { plan }),
     verify: (data: Record<string, string>) =>
       req<{ success: boolean; plan: string; expires_at: string }>('POST', '/payment/verify', data),
+  },
+
+  feedback: {
+    list: () => req<{ user_name: string; user_role: string; message: string; rating: number; created_at: string }[]>('GET', '/feedback/'),
+    submit: (data: { user_name: string; user_role: string; message: string; rating: number }) =>
+      req<{ success: boolean }>('POST', '/feedback/', data),
   },
 }

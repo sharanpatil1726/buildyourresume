@@ -380,14 +380,25 @@ Extract and return ONLY valid JSON (no markdown, no explanation):
     "remote_roles": <0-100>
   }},
   "gap_analysis": {{
-    "skill_gaps": [<skills to acquire for growth>],
+    "skill_gaps": [<3-5 skills/projects to build for portfolio>],
     "experience_gaps": [<experience areas to build>],
     "estimated_learning_time": "<time to close gaps>"
   }},
   "career_path": "<2-3 sentence career progression recommendation>",
   "verdict": "<1-2 sentence resume quality summary>",
   "top_recommendation": "<single most important improvement>",
-  "secondary_recommendations": [<2-3 other important improvements>]
+  "secondary_recommendations": [<2-3 other important improvements>],
+  "interview_questions": ["<5 most common technical interview questions for this specific role>"],
+  "salary_negotiation": {{
+    "expected_range": "<₹X–Y LPA based on role, level and Indian market>",
+    "negotiation_tips": ["<3 specific salary negotiation tips for this role>"]
+  }},
+  "role_guide": {{
+    "key_responsibilities": ["<3 key job responsibilities for this role>"],
+    "must_have_skills": ["<3 priority skills to develop next>"],
+    "certifications": ["<2-3 most valuable certifications for this role>"],
+    "next_steps": "<2-sentence immediate action plan to improve candidacy>"
+  }}
 }}"""
     
     try:
@@ -416,7 +427,10 @@ Extract and return ONLY valid JSON (no markdown, no explanation):
             "market_demand": {},
             "interview_likelihood": {},
             "gap_analysis": {},
-            "experience_highlights": []
+            "experience_highlights": [],
+            "interview_questions": [],
+            "salary_negotiation": {},
+            "role_guide": {},
         }
 
 
@@ -487,6 +501,9 @@ def analyze_resume(resume_text: str, target_role: str, experience_level: str) ->
         "ats_breakdown": ats_breakdown,
         "verdict": ai_insights.get("verdict", "Resume analysis complete"),
         "top_recommendation": ai_insights.get("top_recommendation", "Improve overall quality"),
+        "interview_questions": ai_insights.get("interview_questions", []),
+        "salary_negotiation": ai_insights.get("salary_negotiation", {}),
+        "role_guide": ai_insights.get("role_guide", {}),
     }
     
     logger.info(f"Analysis complete. ATS Score: {ats_score}, Candidate Level: {result['candidate_level']}")

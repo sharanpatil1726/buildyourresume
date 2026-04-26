@@ -139,3 +139,18 @@ class CoverLetterRequest(BaseModel):
     resume_text: str
     target_role: str
     company: str = ""
+
+
+# ── Scan Unlock ───────────────────────────
+class VerifyUnlockRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+
+
+# ── Feedback ──────────────────────────────
+class FeedbackRequest(BaseModel):
+    user_name: str
+    user_role: str = ""
+    message: str
+    rating: int = 5

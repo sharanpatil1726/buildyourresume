@@ -5,10 +5,7 @@ export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
+  const handleLogout = () => { logout(); navigate('/login') }
 
   const planClass = user?.plan === 'pro' ? 'pro' : user?.plan === 'career' ? 'career' : ''
 
@@ -22,11 +19,9 @@ export default function Navbar() {
       <NavLink to="/jobs"      className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Jobs</NavLink>
       <NavLink to="/tracker"   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>Tracker</NavLink>
       <div className="navbar-right">
-        {user?.plan && (
-          <span className={`plan-badge ${planClass}`}>{user.plan}</span>
-        )}
+        {user?.plan && <span className={`plan-badge ${planClass}`}>{user.plan}</span>}
         {user?.plan === 'free' && (
-          <NavLink to="/pricing" className="btn btn-primary btn-sm">Upgrade</NavLink>
+          <NavLink to="/pricing" className="btn btn-primary btn-sm">Upgrade ⚡</NavLink>
         )}
         <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Logout</button>
       </div>

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from loguru import logger
 
 from config import get_settings
-from routers import auth, analyze, jobs, payment, resume, tracker
+from routers import auth, analyze, jobs, payment, resume, tracker, feedback
 from routers import cron
 
 settings = get_settings()
@@ -51,6 +51,7 @@ app.include_router(analyze.router,  prefix="/api/analyze", tags=["Analyze"])
 app.include_router(jobs.router,     prefix="/api/jobs",    tags=["Jobs"])
 app.include_router(payment.router,  prefix="/api/payment", tags=["Payment"])
 app.include_router(tracker.router,  prefix="/api/tracker", tags=["Tracker"])
+app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(cron.router,     prefix="/api/cron",    tags=["Cron"])
 
 

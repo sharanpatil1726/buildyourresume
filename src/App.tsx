@@ -9,6 +9,7 @@ import Analyze from './pages/Analyze'
 import Jobs from './pages/Jobs'
 import Tracker from './pages/Tracker'
 import Pricing from './pages/Pricing'
+import ScanResult from './pages/ScanResult'
 
 export default function App() {
   const { user } = useAuth()
@@ -24,6 +25,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/analyze" element={<Analyze />} />
+          <Route path="/scan/:id" element={<ScanResult />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/tracker" element={<Tracker />} />
           <Route path="/pricing" element={<Pricing />} />
