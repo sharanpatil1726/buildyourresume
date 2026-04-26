@@ -24,15 +24,10 @@ python-docx==1.1.2
 # Email
 resend==2.0.0
 
-# Scheduler (cron jobs)
+# Scheduler
 apscheduler==3.10.4
 
 # Utils
 python-dotenv==1.0.1
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-slowapi==0.1.9
 loguru==0.7.2
-
-# CORS
 starlette==0.37.2
