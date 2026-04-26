@@ -5,13 +5,13 @@ pydantic==2.7.4
 pydantic-settings==2.3.4
 
 # Supabase
-supabase==2.15.2
+supabase==2.29.0
 
 # Anthropic Claude
 anthropic==0.97.0
 
 # Job APIs
-httpx==0.27.0
+httpx==0.28.1
 aiohttp==3.11.18
 
 # File parsing
