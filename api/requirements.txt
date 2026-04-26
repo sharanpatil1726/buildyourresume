@@ -10,9 +10,6 @@ supabase==2.9.1
 # Anthropic Claude
 anthropic==0.49.0
 
-# Razorpay
-razorpay==1.4.1
-
 # Job APIs
 httpx==0.27.0
 aiohttp==3.9.5
