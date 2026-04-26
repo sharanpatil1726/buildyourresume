@@ -8,7 +8,14 @@ from database import supabase_admin
 import anthropic
 
 settings = get_settings()
-client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+_anthropic_client: anthropic.Anthropic | None = None
+
+
+def _get_client() -> anthropic.Anthropic:
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    return _anthropic_client
 
 CACHE_TTL_HOURS = 2
 
@@ -67,7 +74,7 @@ Return ONLY a valid JSON array of skills (no markdown, no explanation):
 
 Be specific and include emerging technologies, frameworks, and tools."""
         
-        message = client.messages.create(
+        message = _get_client().messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=500,
             messages=[{"role": "user", "content": prompt}]
