@@ -257,7 +257,7 @@ def calculate_content_score(resume_text: str) -> int:
     achievement_count = sum(len(re.findall(p, resume_text, re.IGNORECASE)) for p in achievement_patterns)
     score += min(10, achievement_count * 2)
     
-    return max(0, min(100, score))
+    return int(max(0, min(100, score)))
 
 
 def calculate_readability_score(resume_text: str) -> int:

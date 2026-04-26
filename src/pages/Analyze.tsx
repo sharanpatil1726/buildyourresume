@@ -6,6 +6,7 @@ const EXP_LEVELS = ['Fresher (0–1 yr)', 'Junior (1–2 yrs)', 'Mid Level (2–
 function scoreClass(s: number) { return s >= 75 ? 'good' : s >= 50 ? 'ok' : 'bad' }
 function scoreColor(s: number) { return s >= 75 ? 'var(--success)' : s >= 50 ? 'var(--warning)' : 'var(--error)' }
 function scoreLabel(s: number) { return s >= 75 ? 'Strong' : s >= 50 ? 'Average' : 'Needs Work' }
+function safeArr(v: unknown): string[] { return Array.isArray(v) ? (v as string[]) : [] }
 
 export default function Analyze() {
   const [file, setFile] = useState<File | null>(null)
@@ -210,19 +211,19 @@ export default function Analyze() {
           <div className="card card-sm">
             <p className="section-title">Strengths</p>
             <ul className="check-list">
-              {(r?.strengths as string[] ?? []).map((s, i) => <li key={i}>{s}</li>)}
+              {safeArr(r?.strengths).map((s, i) => <li key={i}>{s}</li>)}
             </ul>
           </div>
           <div className="card card-sm">
             <p className="section-title">Areas to Improve</p>
             <ul className="check-list cross-list">
-              {(r?.weaknesses as string[] ?? []).map((s, i) => <li key={i}>{s}</li>)}
+              {safeArr(r?.weaknesses).map((s, i) => <li key={i}>{s}</li>)}
             </ul>
           </div>
           <div className="card card-sm">
             <p className="section-title">Quick Fixes</p>
             <ul className="check-list bullet-list">
-              {(r?.quick_fixes as string[] ?? []).map((s, i) => <li key={i}>{s}</li>)}
+              {safeArr(r?.quick_fixes).map((s, i) => <li key={i}>{s}</li>)}
             </ul>
           </div>
         </div>
@@ -232,13 +233,13 @@ export default function Analyze() {
           <div className="card card-sm">
             <p className="section-title">Skills Found</p>
             <div className="tags">
-              {(r?.top_skills as string[] ?? []).map(s => <span key={s} className="tag success">{s}</span>)}
+              {safeArr(r?.top_skills).map(s => <span key={s} className="tag success">{s}</span>)}
             </div>
           </div>
           <div className="card card-sm">
             <p className="section-title">Missing Keywords</p>
             <div className="tags">
-              {(r?.missing_keywords as string[] ?? []).map(s => <span key={s} className="tag missing">{s}</span>)}
+              {safeArr(r?.missing_keywords).map(s => <span key={s} className="tag missing">{s}</span>)}
             </div>
           </div>
         </div>

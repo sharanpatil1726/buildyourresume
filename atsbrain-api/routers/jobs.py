@@ -22,20 +22,14 @@ async def search_jobs(
 ):
     offset = (page - 1) * page_size
 
-    # Check if we have fresh cache for this query
+    # Check cache — all external fetches happen in background so the response is instant
     cache_hit = has_fresh_cache(role, location) if role else False
 
     if not cache_hit:
-        # Fetch live from Adzuna (blocking — user waits ~1-2s)
-        try:
-            adzuna_jobs = await fetch_adzuna_jobs(role or "software engineer", location)
-            upsert_jobs(adzuna_jobs)
-        except Exception as e:
-            logger.error(f"Adzuna fetch failed: {e}")
-
-        # LinkedIn + Google fetch in background (non-blocking)
         async def bg_fetch():
             try:
+                adzuna_jobs = await fetch_adzuna_jobs(role or "software engineer", location)
+                upsert_jobs(adzuna_jobs)
                 li_jobs = await fetch_linkedin_jobs(role or "software engineer", location)
                 upsert_jobs(li_jobs)
                 g_jobs = await fetch_google_jobs(role or "software engineer", location)
@@ -45,27 +39,31 @@ async def search_jobs(
 
         asyncio.create_task(bg_fetch())
 
-    # Query Supabase
-    query = (
-        supabase_admin.table("jobs")
-        .select("*", count="exact")
-        .eq("is_active", True)
-        .order("posted_at", desc=True)
-        .range(offset, offset + page_size - 1)
-    )
-    if role:     query = query.ilike("title", f"%{role}%")
-    if location and location.lower() != "india":
-        query = query.ilike("location", f"%{location}%")
-    if source != "all":
-        query = query.eq("source", source)
+    # Query Supabase immediately — don't wait for external APIs
+    try:
+        query = (
+            supabase_admin.table("jobs")
+            .select("*", count="exact")
+            .eq("is_active", True)
+            .order("posted_at", desc=True)
+            .range(offset, offset + page_size - 1)
+        )
+        if role:     query = query.ilike("title", f"%{role}%")
+        if location and location.lower() != "india":
+            query = query.ilike("location", f"%{location}%")
+        if source != "all":
+            query = query.eq("source", source)
 
-    result = query.execute()
+        result = query.execute()
+    except Exception as e:
+        logger.error(f"Jobs DB query failed: {e}")
+        return {"jobs": [], "total": 0, "page": page, "pages": 0, "from_cache": False}
 
     return {
         "jobs":       result.data or [],
         "total":      result.count or 0,
         "page":       page,
-        "pages":      -(-( result.count or 0) // page_size),  # ceiling division
+        "pages":      -(-(result.count or 0) // page_size),
         "from_cache": cache_hit,
     }
 
