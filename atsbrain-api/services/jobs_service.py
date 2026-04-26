@@ -336,13 +336,17 @@ def upsert_jobs(jobs: list[dict]) -> int:
 def has_fresh_cache(role: str, location: str) -> bool:
     """Check if we already have fresh results for this query (< 2 hours old)."""
     from datetime import timedelta
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=CACHE_TTL_HOURS)).isoformat()
-    result = (
-        supabase_admin.table("jobs")
-        .select("id", count="exact")
-        .ilike("title", f"%{role}%")
-        .gte("fetched_at", cutoff)
-        .eq("is_active", True)
-        .execute()
-    )
-    return (result.count or 0) >= 5
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=CACHE_TTL_HOURS)).isoformat()
+        result = (
+            supabase_admin.table("jobs")
+            .select("id", count="exact")
+            .ilike("title", f"%{role}%")
+            .gte("fetched_at", cutoff)
+            .neq("is_active", False)
+            .execute()
+        )
+        return (result.count or 0) >= 5
+    except Exception as e:
+        logger.warning(f"has_fresh_cache failed: {e}")
+        return False  # treat as stale so a fresh fetch is attempted
