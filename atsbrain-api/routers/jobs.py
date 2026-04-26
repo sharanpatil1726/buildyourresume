@@ -2,8 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from middleware import get_current_user
 from database import supabase_admin
 from services.jobs_service import (
-    fetch_adzuna_jobs, fetch_linkedin_jobs, fetch_google_jobs,
-    upsert_jobs, has_fresh_cache, score_job_match
+    fetch_adzuna_jobs, upsert_jobs, has_fresh_cache,
 )
 import asyncio
 from loguru import logger
@@ -21,36 +20,21 @@ async def search_jobs(
     user=Depends(get_current_user),
 ):
     offset = (page - 1) * page_size
+    search_role = role or "software engineer"
 
-    cache_hit = has_fresh_cache(role, location) if role else True
-
-    async def bg_fetch_all(search_role: str):
+    # Always kick off a background refresh — never block the response on external APIs
+    async def bg_refresh():
+        if has_fresh_cache(search_role, location):
+            return
         try:
             jobs = await fetch_adzuna_jobs(search_role, location)
             upsert_jobs(jobs)
-            li = await fetch_linkedin_jobs(search_role, location)
-            upsert_jobs(li)
-            g = await fetch_google_jobs(search_role, location)
-            upsert_jobs(g)
         except Exception as e:
             logger.error(f"Background fetch error: {e}")
 
-    if not cache_hit:
-        search_role = role or "software engineer"
-        # Check if DB has any jobs at all
-        any_jobs = supabase_admin.table("jobs").select("id", count="exact").eq("is_active", True).execute()
-        if (any_jobs.count or 0) == 0:
-            # DB is empty — must await so user sees something
-            try:
-                adzuna_jobs = await fetch_adzuna_jobs(search_role, location)
-                upsert_jobs(adzuna_jobs)
-            except Exception as e:
-                logger.error(f"Adzuna fetch error: {e}")
-        else:
-            # DB has jobs — return them instantly, refresh in background
-            asyncio.create_task(bg_fetch_all(search_role))
+    asyncio.create_task(bg_refresh())
 
-    # Query Supabase immediately — don't wait for external APIs
+    # Query DB immediately and return — response is always fast
     try:
         query = (
             supabase_admin.table("jobs")
@@ -75,7 +59,7 @@ async def search_jobs(
         "total":      result.count or 0,
         "page":       page,
         "pages":      -(-(result.count or 0) // page_size),
-        "from_cache": cache_hit,
+        "from_cache": True,
     }
 
 
