@@ -5,7 +5,14 @@ from config import get_settings
 from loguru import logger
 
 settings = get_settings()
-client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+_anthropic_client: anthropic.Anthropic | None = None
+
+
+def _get_client() -> anthropic.Anthropic:
+    global _anthropic_client
+    if _anthropic_client is None:
+        _anthropic_client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    return _anthropic_client
 
 # ─────────────────────────────────────────
 # COMPREHENSIVE ROLE-SPECIFIC KEYWORDS DATABASE
@@ -384,7 +391,7 @@ Extract and return ONLY valid JSON (no markdown, no explanation):
 }}"""
     
     try:
-        message = client.messages.create(
+        message = _get_client().messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": insight_prompt}]
@@ -488,7 +495,7 @@ def analyze_resume(resume_text: str, target_role: str, experience_level: str) ->
 
 def generate_cover_letter(resume_text: str, target_role: str, company: str = "") -> str:
     """Generates a personalized cover letter using real resume data."""
-    message = client.messages.create(
+    message = _get_client().messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=800,
         messages=[{
@@ -510,7 +517,7 @@ def generate_optimized_resume(resume_text: str, target_role: str, missing_keywor
     """Generate ATS-optimized resume using real candidate information."""
     keywords_str = f"\nPrioritize these keywords: {', '.join(missing_keywords)}" if missing_keywords else ""
     
-    message = client.messages.create(
+    message = _get_client().messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=2000,
         messages=[{

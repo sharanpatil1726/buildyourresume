@@ -8,10 +8,10 @@ pydantic==2.7.4
 pydantic-settings==2.3.4
 
 # Supabase
-supabase==2.5.0
+supabase==2.9.1
 
 # Anthropic Claude
-anthropic==0.30.0
+anthropic==0.49.0
 
 # Razorpay
 razorpay==1.4.1

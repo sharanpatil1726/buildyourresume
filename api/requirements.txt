@@ -1,26 +1,25 @@
 fastapi==0.111.0
 uvicorn[standard]==0.30.1
-python-multipart==0.0.9        # file uploads
+python-multipart==0.0.9
 pydantic==2.7.4
 pydantic-settings==2.3.4
 
 # Supabase
-supabase==2.5.0
+supabase==2.9.1
 
 # Anthropic Claude
-anthropic==0.30.0
+anthropic==0.49.0
 
 # Razorpay
 razorpay==1.4.1
 
 # Job APIs
-httpx==0.27.0                  # async HTTP client (replaces requests)
+httpx==0.27.0
 aiohttp==3.9.5
 
 # File parsing
-pdfplumber==0.10.1             # Reliable PDF text extraction
-PyMuPDF==1.24.7                # PDF text extraction fallback (fitz)
-python-docx==1.1.2             # DOCX extraction
+pdfplumber==0.10.1
+python-docx==1.1.2
 
 # Email
 resend==2.0.0
@@ -30,10 +29,10 @@ apscheduler==3.10.4
 
 # Utils
 python-dotenv==1.0.1
-python-jose[cryptography]==3.3.0   # JWT
+python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-slowapi==0.1.9                 # rate limiting
-loguru==0.7.2                  # logging
+slowapi==0.1.9
+loguru==0.7.2
 
 # CORS
 starlette==0.37.2

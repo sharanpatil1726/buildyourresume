@@ -5,14 +5,14 @@ from config import get_settings
 
 settings = get_settings()
 
-rz_client = razorpay.Client(
-    auth=(settings.razorpay_key_id, settings.razorpay_key_secret)
-)
+
+def _get_rz_client() -> razorpay.Client:
+    return razorpay.Client(auth=(settings.razorpay_key_id, settings.razorpay_key_secret))
 
 
 def create_order(amount: int, receipt: str, notes: dict) -> dict:
     """Create a Razorpay order. Amount in paise."""
-    return rz_client.order.create({
+    return _get_rz_client().order.create({
         "amount":   amount,
         "currency": "INR",
         "receipt":  receipt,
