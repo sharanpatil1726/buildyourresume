@@ -12,13 +12,18 @@ function safeObj(v: unknown): Record<string, unknown> { return v && typeof v ===
 function scoreClass(s: number) { return s >= 75 ? 'good' : s >= 50 ? 'ok' : 'bad' }
 function scoreColor(s: number) { return s >= 75 ? 'var(--success)' : s >= 50 ? 'var(--gold)' : 'var(--error)' }
 
-function ScoreBar({ label, value, barClass }: { label: string; value: number; barClass: string }) {
+function ScoreBar({ label, value, barClass, blurValue = false }: { label: string; value: number; barClass: string; blurValue?: boolean }) {
   const v = typeof value === 'number' ? value : 0
   return (
     <div className="score-bar-wrap">
       <div className="score-bar-label">
         <span>{label}</span>
-        <span style={{ color: scoreColor(v), fontWeight: 700 }}>{v}</span>
+        <span style={{
+          color: blurValue ? 'var(--muted)' : scoreColor(v),
+          fontWeight: 700,
+          filter: blurValue ? 'blur(5px)' : 'none',
+          userSelect: blurValue ? 'none' : 'auto',
+        }}>{v}</span>
       </div>
       <div className="score-bar-track">
         <div className={`score-bar-fill ${barClass}`} style={{ width: `${v}%` }} />
@@ -93,21 +98,35 @@ export default function ScanResult() {
     }
   }
 
-  const handleDownload = async (type: 'txt' | 'pdf') => {
+  const handleDownload = async (type: 'txt' | 'doc') => {
     if (!id) return
+    if (user?.plan !== 'pro') {
+      setError('Resume download requires Pro plan (₹299/month). Upgrade at /pricing.')
+      return
+    }
     setOptimizeLoading(true)
     try {
       const res = await api.analyze.getOptimized(id)
-      const role = (scan?.target_role as string || 'resume').replace(/\s+/g, '_')
+      const safeName = ((scan?.target_role as string) || 'resume').replace(/\s+/g, '_')
       if (type === 'txt') {
-        const blob = new Blob([res.text], { type: 'text/plain' })
+        const blob = new Blob([res.text], { type: 'text/plain;charset=utf-8' })
         const url = URL.createObjectURL(blob)
-        const a = document.createElement('a'); a.href = url; a.download = `resume_${role}_optimized.txt`; a.click(); URL.revokeObjectURL(url)
+        const a = document.createElement('a')
+        a.href = url; a.download = `${safeName}_optimized.txt`
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        URL.revokeObjectURL(url)
       } else {
-        const html = `<html><head><meta charset="utf-8"/><style>body{font-family:Arial;font-size:12pt;line-height:1.5;margin:2cm;}pre{white-space:pre-wrap;font-family:inherit;}</style></head><body><pre>${res.text.replace(/</g, '&lt;')}</pre></body></html>`
-        const blob = new Blob([html], { type: 'application/msword' })
+        const rtfLines = res.text
+          .split('\n')
+          .map((line: string) => line.replace(/\\/g, '\\\\').replace(/[{}]/g, '\\$&'))
+          .join('\\par\n')
+        const rtf = `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\froman\\fcharset0 Arial;}}\n{\\colortbl;\\red0\\green0\\blue0;}\n\\f0\\fs24\\sl360\\slmult1\n${rtfLines}\n}`
+        const blob = new Blob([rtf], { type: 'application/rtf' })
         const url = URL.createObjectURL(blob)
-        const a = document.createElement('a'); a.href = url; a.download = `resume_${role}_optimized.doc`; a.click(); URL.revokeObjectURL(url)
+        const a = document.createElement('a')
+        a.href = url; a.download = `${safeName}_optimized.rtf`
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        URL.revokeObjectURL(url)
       }
     } catch {
       setError('Could not generate optimized resume')
@@ -140,11 +159,14 @@ export default function ScanResult() {
             </button>
           )}
           {isUnlocked && <span style={{ fontSize: '.8rem', color: 'var(--success)', fontWeight: 700, padding: '6px 12px', background: 'var(--success-light)', borderRadius: 6 }}>✅ Fully Unlocked</span>}
-          {isUnlocked && (
+          {isUnlocked && user?.plan === 'pro' && (
             <>
               <button className="btn btn-accent btn-sm" onClick={() => handleDownload('txt')} disabled={optimizeLoading}>{optimizeLoading ? '⏳' : '📄 Download TXT'}</button>
-              <button className="btn btn-outline btn-sm" onClick={() => handleDownload('pdf')} disabled={optimizeLoading}>{optimizeLoading ? '⏳' : '📝 Download DOC'}</button>
+              <button className="btn btn-outline btn-sm" onClick={() => handleDownload('doc')} disabled={optimizeLoading}>{optimizeLoading ? '⏳' : '📝 Download RTF/DOC'}</button>
             </>
+          )}
+          {isUnlocked && user?.plan !== 'pro' && (
+            <a href="/pricing" className="btn btn-gold btn-sm" style={{ textDecoration: 'none' }}>⭐ Pro to Download</a>
           )}
         </div>
 
@@ -161,10 +183,15 @@ export default function ScanResult() {
         <div className="results-grid" style={{ marginBottom: 16 }}>
           <div className="card" style={{ background: 'linear-gradient(135deg,#f5f3ff,white)' }}>
             <p className="section-title">Score Breakdown</p>
-            <ScoreBar label="Keywords Match" value={r.keyword_score as number} barClass="bar-violet" />
-            <ScoreBar label="Format Quality" value={r.format_score as number} barClass="bar-cyan" />
-            <ScoreBar label="Content Quality" value={r.content_score as number} barClass="bar-emerald" />
-            <ScoreBar label="Readability" value={r.readability_score as number} barClass="bar-amber" />
+            {!isUnlocked && (
+              <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 10, fontStyle: 'italic' }}>
+                🔒 Unlock full report to see exact scores
+              </p>
+            )}
+            <ScoreBar label="Keywords Match" value={r.keyword_score as number} barClass="bar-violet" blurValue={!isUnlocked} />
+            <ScoreBar label="Format Quality" value={r.format_score as number} barClass="bar-cyan" blurValue={!isUnlocked} />
+            <ScoreBar label="Content Quality" value={r.content_score as number} barClass="bar-emerald" blurValue={!isUnlocked} />
+            <ScoreBar label="Readability" value={r.readability_score as number} barClass="bar-amber" blurValue={!isUnlocked} />
           </div>
           <div className="card" style={{ background: 'linear-gradient(135deg,#ecfeff,white)' }}>
             <p className="section-title">Interview Likelihood</p>

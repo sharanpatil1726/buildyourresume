@@ -104,13 +104,18 @@ function safeObj(v: unknown): Record<string, unknown> { return v && typeof v ===
 function scoreClass(s: number) { return s >= 75 ? 'good' : s >= 50 ? 'ok' : 'bad' }
 function scoreColor(s: number) { return s >= 75 ? 'var(--success)' : s >= 50 ? 'var(--gold)' : 'var(--error)' }
 
-function ScoreBar({ label, value, barClass }: { label: string; value: number; barClass: string }) {
+function ScoreBar({ label, value, barClass, blurValue = false }: { label: string; value: number; barClass: string; blurValue?: boolean }) {
   const v = typeof value === 'number' ? value : 0
   return (
     <div className="score-bar-wrap">
       <div className="score-bar-label">
         <span>{label}</span>
-        <span style={{ color: scoreColor(v), fontWeight: 700 }}>{v}</span>
+        <span style={{
+          color: blurValue ? 'var(--muted)' : scoreColor(v),
+          fontWeight: 700,
+          filter: blurValue ? 'blur(5px)' : 'none',
+          userSelect: blurValue ? 'none' : 'auto',
+        }}>{v}</span>
       </div>
       <div className="score-bar-track">
         <div className={`score-bar-fill ${barClass}`} style={{ width: `${v}%` }} />
@@ -235,24 +240,36 @@ export default function Analyze() {
     }
   }
 
-  const handleDownload = async (type: 'txt' | 'pdf') => {
+  const handleDownload = async (type: 'txt' | 'doc') => {
     if (!scanId) return
+    if (user?.plan !== 'pro') {
+      setError('Resume download requires Pro plan (₹299/month). Upgrade at /pricing.')
+      return
+    }
     setOptimizeLoading(true)
     try {
       const res = await api.analyze.getOptimized(scanId)
+      const safeName = targetRole.replace(/\s+/g, '_') || 'resume'
       if (type === 'txt') {
-        const blob = new Blob([res.text], { type: 'text/plain' })
+        const blob = new Blob([res.text], { type: 'text/plain;charset=utf-8' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
-        a.href = url; a.download = `resume_${targetRole.replace(/\s+/g, '_')}_optimized.txt`
-        a.click(); URL.revokeObjectURL(url)
+        a.href = url; a.download = `${safeName}_optimized.txt`
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        URL.revokeObjectURL(url)
       } else {
-        const htmlContent = `<html><head><meta charset="utf-8"/><style>body{font-family:Arial;font-size:12pt;line-height:1.5;margin:2cm;}pre{white-space:pre-wrap;font-family:inherit;}</style></head><body><pre>${res.text.replace(/</g, '&lt;')}</pre></body></html>`
-        const blob = new Blob([htmlContent], { type: 'application/msword' })
+        // RTF format — opens in Word, Google Docs, Pages on all platforms
+        const rtfLines = res.text
+          .split('\n')
+          .map(line => line.replace(/\\/g, '\\\\').replace(/[{}]/g, '\\$&'))
+          .join('\\par\n')
+        const rtf = `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\froman\\fcharset0 Arial;}}\n{\\colortbl;\\red0\\green0\\blue0;}\n\\f0\\fs24\\sl360\\slmult1\n${rtfLines}\n}`
+        const blob = new Blob([rtf], { type: 'application/rtf' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
-        a.href = url; a.download = `resume_${targetRole.replace(/\s+/g, '_')}_optimized.doc`
-        a.click(); URL.revokeObjectURL(url)
+        a.href = url; a.download = `${safeName}_optimized.rtf`
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        URL.revokeObjectURL(url)
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not generate optimized resume')
@@ -364,15 +381,20 @@ export default function Analyze() {
               ✅ Fully Unlocked
             </span>
           )}
-          {isUnlocked && scanId && (
+          {isUnlocked && scanId && user?.plan === 'pro' && (
             <div className="download-row">
               <button className="btn btn-accent btn-sm" onClick={() => handleDownload('txt')} disabled={optimizeLoading}>
                 {optimizeLoading ? '⏳' : '📄 Download TXT'}
               </button>
-              <button className="btn btn-outline btn-sm" onClick={() => handleDownload('pdf')} disabled={optimizeLoading}>
-                📝 Download DOC
+              <button className="btn btn-outline btn-sm" onClick={() => handleDownload('doc')} disabled={optimizeLoading}>
+                📝 Download RTF/DOC
               </button>
             </div>
+          )}
+          {isUnlocked && scanId && user?.plan !== 'pro' && (
+            <a href="/pricing" className="btn btn-gold btn-sm" style={{ textDecoration: 'none' }}>
+              ⭐ Pro to Download Resume
+            </a>
           )}
         </div>
 
@@ -384,10 +406,15 @@ export default function Analyze() {
         <div className="results-grid" style={{ marginBottom: 16 }}>
           <div className="card" style={{ background: 'linear-gradient(135deg,#f5f3ff,white)' }}>
             <p className="section-title">Score Breakdown</p>
-            <ScoreBar label="Keywords Match"  value={r?.keyword_score as number}    barClass="bar-violet" />
-            <ScoreBar label="Format Quality"  value={r?.format_score as number}     barClass="bar-cyan" />
-            <ScoreBar label="Content Quality" value={r?.content_score as number}    barClass="bar-emerald" />
-            <ScoreBar label="Readability"     value={r?.readability_score as number} barClass="bar-amber" />
+            {!isUnlocked && (
+              <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 10, fontStyle: 'italic' }}>
+                🔒 Unlock full report to see exact scores
+              </p>
+            )}
+            <ScoreBar label="Keywords Match"  value={r?.keyword_score as number}    barClass="bar-violet"  blurValue={!isUnlocked} />
+            <ScoreBar label="Format Quality"  value={r?.format_score as number}     barClass="bar-cyan"    blurValue={!isUnlocked} />
+            <ScoreBar label="Content Quality" value={r?.content_score as number}    barClass="bar-emerald" blurValue={!isUnlocked} />
+            <ScoreBar label="Readability"     value={r?.readability_score as number} barClass="bar-amber"  blurValue={!isUnlocked} />
           </div>
 
           <div className="card" style={{ background: 'linear-gradient(135deg,#ecfeff,white)' }}>
@@ -644,14 +671,25 @@ export default function Analyze() {
             <p style={{ color: 'var(--muted)', fontSize: '.875rem', marginBottom: 16 }}>
               AI-rewritten version of your resume with keywords, strong verbs &amp; ATS-safe format
             </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button className="btn btn-accent" onClick={() => handleDownload('txt')} disabled={optimizeLoading}>
-                {optimizeLoading ? '⏳ Generating…' : '📄 Download as TXT'}
-              </button>
-              <button className="btn btn-outline" onClick={() => handleDownload('pdf')} disabled={optimizeLoading}>
-                {optimizeLoading ? '⏳ Generating…' : '📝 Download as DOC'}
-              </button>
-            </div>
+            {user?.plan === 'pro' ? (
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button className="btn btn-accent" onClick={() => handleDownload('txt')} disabled={optimizeLoading}>
+                  {optimizeLoading ? '⏳ Generating…' : '📄 Download as TXT'}
+                </button>
+                <button className="btn btn-outline" onClick={() => handleDownload('doc')} disabled={optimizeLoading}>
+                  {optimizeLoading ? '⏳ Generating…' : '📝 Download as RTF/DOC'}
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p style={{ color: 'var(--gold)', fontSize: '.85rem', marginBottom: 12, fontWeight: 600 }}>
+                  ⭐ Resume download is a Pro feature
+                </p>
+                <a href="/pricing" className="btn btn-gold" style={{ textDecoration: 'none' }}>
+                  Upgrade to Pro — ₹299/month
+                </a>
+              </div>
+            )}
           </div>
         )}
       </div>

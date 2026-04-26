@@ -50,10 +50,14 @@ async def get_current_profile(user=Depends(get_current_user)):
 
 
 async def require_pro(profile=Depends(get_current_profile)):
-    """Gate routes behind Pro/Career plan."""
-    if profile["plan"] not in ("pro", "career"):
+    """Gate routes behind Pro plan."""
+    if profile["plan"] != "pro":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="This feature requires a Pro plan. Upgrade at /pricing.",
+            detail="This feature requires a Pro plan (₹299/month). Upgrade at /pricing.",
         )
     return profile
+
+
+# Alias used by newer routes — same check, clearer name
+require_paid = require_pro

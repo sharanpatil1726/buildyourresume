@@ -45,17 +45,11 @@ def get_settings() -> Settings:
     return Settings()
 
 
-# Plan definitions
+# Plan definitions — only Pro is active; Career is disabled
 PLANS = {
     "pro": {
         "name": "Pro",
-        "amount": 74900,
-        "duration_days": 30,
-        "scans_limit": 9999,
-    },
-    "career": {
-        "name": "Career+",
-        "amount": 139900,
+        "amount": 29900,   # ₹299/month
         "duration_days": 30,
         "scans_limit": 9999,
     },

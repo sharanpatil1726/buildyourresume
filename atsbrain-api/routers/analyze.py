@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status as http_status
 from middleware import get_current_user, get_current_profile
 from database import supabase_admin
 from models import AnalyzeRequest, CoverLetterRequest, VerifyUnlockRequest
@@ -142,7 +142,12 @@ async def verify_unlock(scan_id: str, body: VerifyUnlockRequest, user=Depends(ge
 
 
 @router.get("/{scan_id}/optimized")
-async def get_optimized_resume(scan_id: str, user=Depends(get_current_user)):
+async def get_optimized_resume(scan_id: str, user=Depends(get_current_user), profile=Depends(get_current_profile)):
+    if profile["plan"] != "pro":
+        raise HTTPException(
+            status_code=403,
+            detail="Resume download requires Pro plan (₹299/month). Upgrade at /pricing.",
+        )
     scan = (
         supabase_admin.table("scans")
         .select("optimized_resume, result_json, target_role")

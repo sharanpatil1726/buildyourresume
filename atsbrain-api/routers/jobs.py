@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
-from middleware import get_current_user
+from middleware import get_current_user, get_current_profile
 from database import supabase_admin
 from services.jobs_service import (
     fetch_adzuna_jobs, fetch_remotive_jobs, fetch_arbeitnow_jobs,
@@ -174,8 +174,13 @@ async def get_saved_jobs(user=Depends(get_current_user)):
 
 
 @router.post("/{job_id}/apply")
-async def track_apply(job_id: str, user=Depends(get_current_user)):
-    """Track that user clicked Apply on a job."""
+async def track_apply(job_id: str, user=Depends(get_current_user), profile=Depends(get_current_profile)):
+    """Track that user clicked Apply on a job (Pro plan required)."""
+    if profile["plan"] != "pro":
+        raise HTTPException(
+            status_code=403,
+            detail="Applying to jobs requires Pro plan (₹299/month). Upgrade at /pricing.",
+        )
     job = supabase_admin.table("jobs").select("*").eq("id", job_id).single().execute()
     if not job.data:
         raise HTTPException(status_code=404, detail="Job not found")
