@@ -365,7 +365,7 @@ def upsert_jobs(jobs: list[dict]) -> int:
     """Save jobs to Supabase. Updates if external_id already exists."""
     if not jobs:
         return 0
-    valid = [j for j in jobs if j.get("apply_url")]
+    valid = [j for j in jobs if j.get("external_id")]
     if not valid:
         return 0
     try:
