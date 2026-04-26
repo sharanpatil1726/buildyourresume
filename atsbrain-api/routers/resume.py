@@ -37,7 +37,7 @@ async def upload_resume(
 
     # Upload to Supabase Storage
     file_path = f"{user.id}/{file.filename}"
-    supabase_admin.storage.from_("resumes").upload(
+    supabase_admin.storage.from_("resume").upload(
         file_path, content,
         file_options={"content-type": file.content_type or "application/octet-stream"}
     )
