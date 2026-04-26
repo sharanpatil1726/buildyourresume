@@ -1,4 +1,4 @@
-import { useState, useRef, DragEvent, ChangeEvent } from 'react'
+import { useState, useRef, useEffect, DragEvent, ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
@@ -8,6 +8,96 @@ declare global {
 }
 
 const EXP_LEVELS = ['Fresher (0–1 yr)', 'Junior (1–2 yrs)', 'Mid Level (2–5 yrs)', 'Senior (5–8 yrs)', 'Lead / Principal (8+ yrs)']
+
+const ANALYSIS_STEPS = [
+  { step: 'Parsing your resume...', fact: '75% of resumes never reach a human — they\'re filtered by ATS first.' },
+  { step: 'Extracting skills & keywords...', fact: 'Resumes with job-matched keywords are 3x more likely to get a callback.' },
+  { step: 'Checking ATS compatibility...', fact: 'Most recruiters spend just 6–7 seconds on the first resume scan.' },
+  { step: 'Analyzing format & structure...', fact: 'Single-column resumes score 25% higher on ATS than multi-column layouts.' },
+  { step: 'Scoring your content quality...', fact: 'Quantified achievements (e.g. "increased sales by 30%") double callback rates.' },
+  { step: 'Computing market demand...', fact: 'India\'s tech job market is growing 15% YoY — the right keywords unlock it.' },
+  { step: 'Generating personalized insights...', fact: 'Tailoring your resume per role increases interview chances by 60%.' },
+  { step: 'Preparing your full report...', fact: 'Top candidates spend ~4 hours optimizing their resume. You\'re almost there.' },
+]
+
+function AnalyzingOverlay() {
+  const [idx, setIdx] = useState(0)
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false)
+      setTimeout(() => {
+        setIdx(i => (i + 1) % ANALYSIS_STEPS.length)
+        setVisible(true)
+      }, 400)
+    }, 3200)
+    return () => clearInterval(interval)
+  }, [])
+
+  const current = ANALYSIS_STEPS[idx]
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(248,246,255,0.96)',
+      backdropFilter: 'blur(12px)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: 28, padding: 24,
+    }}>
+      {/* Spinner ring */}
+      <div style={{ position: 'relative', width: 88, height: 88 }}>
+        <div style={{
+          width: 88, height: 88, borderRadius: '50%',
+          border: '5px solid rgba(124,58,237,.15)',
+          borderTopColor: '#7c3aed',
+          animation: 'spin .9s linear infinite',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '1.8rem',
+        }}>🤖</div>
+      </div>
+
+      {/* Step + fact */}
+      <div style={{
+        textAlign: 'center', maxWidth: 480,
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(6px)',
+        transition: 'opacity .35s ease, transform .35s ease',
+      }}>
+        <p style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--primary)', marginBottom: 10 }}>
+          {current.step}
+        </p>
+        <div style={{
+          background: 'linear-gradient(135deg,#f5f3ff,#ecfeff)',
+          border: '1px solid var(--border)',
+          borderRadius: 12, padding: '14px 20px',
+        }}>
+          <p style={{ fontSize: '.82rem', color: 'var(--muted)', lineHeight: 1.6, fontStyle: 'italic' }}>
+            💡 {current.fact}
+          </p>
+        </div>
+      </div>
+
+      {/* Progress dots */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {ANALYSIS_STEPS.map((_s, i: number) => (
+          <div key={i} style={{
+            width: i === idx ? 20 : 7, height: 7,
+            borderRadius: 4,
+            background: i === idx ? 'var(--primary)' : 'var(--border)',
+            transition: 'all .3s ease',
+          }} />
+        ))}
+      </div>
+
+      <p style={{ fontSize: '.78rem', color: 'var(--muted)' }}>AI analysis takes 15–25 seconds</p>
+    </div>
+  )
+}
 
 function safeArr(v: unknown): string[] { return Array.isArray(v) ? (v as string[]) : [] }
 function safeObj(v: unknown): Record<string, unknown> { return v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {} }
@@ -177,6 +267,7 @@ export default function Analyze() {
   if (!result) {
     return (
       <div className="page">
+        {loading && <AnalyzingOverlay />}
         <div className="page-inner" style={{ maxWidth: 720 }}>
           <h1 className="page-title">ATS Resume Analyzer</h1>
           <p className="page-sub">Upload your resume and get an instant ATS score with AI-powered insights.</p>

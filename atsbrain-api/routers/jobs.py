@@ -19,7 +19,9 @@ def _build_job_query(offset: int, page_size: int, role: str = "", location: str 
         .range(offset, offset + page_size - 1)
     )
     if active_only:
-        q = q.neq("is_active", False)   # accepts True and NULL — never blocks newly fetched jobs
+        # or_() includes both is_active=true AND is_active IS NULL
+        # neq("is_active", False) excludes NULL rows in PostgreSQL, so we use or_ instead
+        q = q.or_("is_active.eq.true,is_active.is.null")
     if role:
         q = q.ilike("title", f"%{role}%")
     if location and location.lower() not in ("india", ""):
@@ -52,35 +54,44 @@ async def search_jobs(
 
     refresh_task = asyncio.create_task(bg_refresh())
 
-    try:
-        # Level 1: role + active filter
-        result = _build_job_query(offset, page_size, role, location, source, active_only=True).execute()
+    def safe_query(*args, **kwargs):
+        try:
+            return _build_job_query(*args, **kwargs).execute()
+        except Exception as e:
+            logger.warning(f"Query failed ({args}, {kwargs}): {e}")
+            return None
 
-        # Level 2: wait for fresh fetch, retry same query
-        if (result.count or 0) == 0:
+    # Level 1: role + active filter
+    result = safe_query(offset, page_size, role, location, source, active_only=True)
+
+    # Level 2: wait for fresh fetch, retry same query
+    if result is None or (result.count or 0) == 0:
+        try:
             await refresh_task
-            result = _build_job_query(offset, page_size, role, location, source, active_only=True).execute()
+        except Exception:
+            pass
+        result = safe_query(offset, page_size, role, location, source, active_only=True)
 
-        # Level 3: drop role filter, keep active filter
-        if (result.count or 0) == 0:
-            result = _build_job_query(offset, page_size, "", location, source, active_only=True).execute()
+    # Level 3: drop role filter, keep active filter
+    if result is None or (result.count or 0) == 0:
+        result = safe_query(offset, page_size, "", location, source, active_only=True)
 
-        # Level 4: drop is_active filter entirely — works even if column is NULL/false
-        if (result.count or 0) == 0:
-            result = _build_job_query(offset, page_size, "", location, source, active_only=False).execute()
+    # Level 4: drop is_active filter entirely — catches any NULL/missing column issues
+    if result is None or (result.count or 0) == 0:
+        result = safe_query(offset, page_size, "", location, source, active_only=False)
 
-        # Level 5: drop location filter too (bare: any job in DB)
-        if (result.count or 0) == 0:
-            result = _build_job_query(offset, page_size, "", "india", source, active_only=False).execute()
+    # Level 5: drop location filter too (any job in DB)
+    if result is None or (result.count or 0) == 0:
+        result = safe_query(offset, page_size, "", "india", source, active_only=False)
 
-        role_matched = bool(role) and (result.count or 0) > 0 and role.lower() in str(result.data or "").lower()
-
-        if (result.count or 0) == 0:
-            logger.warning(f"Jobs DB returned 0 results even with no filters — DB may be empty")
-
-    except Exception as e:
-        logger.error(f"Jobs DB query failed: {e}")
+    if result is None:
+        logger.error("All query levels failed — DB unreachable")
         return {"jobs": [], "total": 0, "page": page, "pages": 0, "from_cache": False, "role_matched": False}
+
+    role_matched = bool(role) and (result.count or 0) > 0 and role.lower() in str(result.data or "").lower()
+
+    if (result.count or 0) == 0:
+        logger.warning("Jobs DB returned 0 results even with no filters — DB may be empty")
 
     total = result.count or 0
     return {

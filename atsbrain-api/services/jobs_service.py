@@ -343,7 +343,7 @@ def has_fresh_cache(role: str, location: str) -> bool:
             .select("id", count="exact")
             .ilike("title", f"%{role}%")
             .gte("fetched_at", cutoff)
-            .neq("is_active", False)
+            .or_("is_active.eq.true,is_active.is.null")
             .execute()
         )
         return (result.count or 0) >= 5
