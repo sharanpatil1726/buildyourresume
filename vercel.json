@@ -1,12 +1,20 @@
 {
-  "functions": {
-    "api/index.py": {
-      "memory": 1024,
-      "maxDuration": 30
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
+    },
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
-  },
-  "rewrites": [
-    { "source": "/((?!api).*)", "destination": "/index.html" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "crons": [
     { "path": "/api/cron/refresh-jobs", "schedule": "0 2 * * *" },
