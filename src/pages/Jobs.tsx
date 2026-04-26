@@ -51,7 +51,7 @@ export default function Jobs() {
     }
   }, [role, location])
 
-  useEffect(() => { search(1) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { search(1) }, []) // load recent jobs from DB on mount
 
   const loadSaved = async () => {
     try {

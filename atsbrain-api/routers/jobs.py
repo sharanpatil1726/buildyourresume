@@ -22,7 +22,7 @@ async def search_jobs(
 ):
     offset = (page - 1) * page_size
 
-    cache_hit = has_fresh_cache(role, location) if role else False
+    cache_hit = has_fresh_cache(role, location) if role else True
 
     if not cache_hit:
         # Await Adzuna so the DB has data before we query it
