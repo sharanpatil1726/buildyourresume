@@ -10,6 +10,25 @@ from loguru import logger
 router = APIRouter()
 
 
+def _build_job_query(offset: int, page_size: int, role: str = "", location: str = "india",
+                     source: str = "all", active_only: bool = False):
+    q = (
+        supabase_admin.table("jobs")
+        .select("*", count="exact")
+        .order("posted_at", desc=True)
+        .range(offset, offset + page_size - 1)
+    )
+    if active_only:
+        q = q.neq("is_active", False)   # accepts True and NULL — never blocks newly fetched jobs
+    if role:
+        q = q.ilike("title", f"%{role}%")
+    if location and location.lower() not in ("india", ""):
+        q = q.ilike("location", f"%{location}%")
+    if source != "all":
+        q = q.eq("source", source)
+    return q
+
+
 @router.get("/")
 async def search_jobs(
     role:      str = Query("", description="Job title or skill"),
@@ -22,7 +41,6 @@ async def search_jobs(
     offset = (page - 1) * page_size
     search_role = role or "software engineer"
 
-    # Always kick off a background refresh — never block the response on external APIs
     async def bg_refresh():
         if has_fresh_cache(search_role, location):
             return
@@ -34,61 +52,65 @@ async def search_jobs(
 
     refresh_task = asyncio.create_task(bg_refresh())
 
-    def _run_query():
-        q = (
-            supabase_admin.table("jobs")
-            .select("*", count="exact")
-            .eq("is_active", True)
-            .order("posted_at", desc=True)
-            .range(offset, offset + page_size - 1)
-        )
-        if role:
-            q = q.ilike("title", f"%{role}%")
-        if location and location.lower() not in ("india", ""):
-            q = q.ilike("location", f"%{location}%")
-        if source != "all":
-            q = q.eq("source", source)
-        return q.execute()
-
     try:
-        result = _run_query()
-        # If DB is empty for this query, wait for the background fetch then retry once
+        # Level 1: role + active filter
+        result = _build_job_query(offset, page_size, role, location, source, active_only=True).execute()
+
+        # Level 2: wait for fresh fetch, retry same query
         if (result.count or 0) == 0:
             await refresh_task
-            result = _run_query()
+            result = _build_job_query(offset, page_size, role, location, source, active_only=True).execute()
 
-        # Final fallback: role title didn't match anything — show any available jobs so page isn't empty
-        role_matched = (result.count or 0) > 0
-        if not role_matched and role:
-            q = (
-                supabase_admin.table("jobs")
-                .select("*", count="exact")
-                .eq("is_active", True)
-                .order("posted_at", desc=True)
-                .range(offset, offset + page_size - 1)
-            )
-            if location and location.lower() not in ("india", ""):
-                q = q.ilike("location", f"%{location}%")
-            if source != "all":
-                q = q.eq("source", source)
-            result = q.execute()
+        # Level 3: drop role filter, keep active filter
+        if (result.count or 0) == 0:
+            result = _build_job_query(offset, page_size, "", location, source, active_only=True).execute()
+
+        # Level 4: drop is_active filter entirely — works even if column is NULL/false
+        if (result.count or 0) == 0:
+            result = _build_job_query(offset, page_size, "", location, source, active_only=False).execute()
+
+        # Level 5: drop location filter too (bare: any job in DB)
+        if (result.count or 0) == 0:
+            result = _build_job_query(offset, page_size, "", "india", source, active_only=False).execute()
+
+        role_matched = bool(role) and (result.count or 0) > 0 and role.lower() in str(result.data or "").lower()
+
+        if (result.count or 0) == 0:
+            logger.warning(f"Jobs DB returned 0 results even with no filters — DB may be empty")
+
     except Exception as e:
         logger.error(f"Jobs DB query failed: {e}")
         return {"jobs": [], "total": 0, "page": page, "pages": 0, "from_cache": False, "role_matched": False}
 
+    total = result.count or 0
     return {
         "jobs":         result.data or [],
-        "total":        result.count or 0,
+        "total":        total,
         "page":         page,
-        "pages":        -(-(result.count or 0) // page_size),
+        "pages":        -(-(total) // page_size) if total else 0,
         "from_cache":   True,
         "role_matched": role_matched if role else True,
     }
 
 
+@router.get("/debug")
+async def jobs_debug(user=Depends(get_current_user)):
+    """Returns counts at each filter level to diagnose why jobs aren't showing."""
+    try:
+        total       = supabase_admin.table("jobs").select("id", count="exact").execute().count or 0
+        active_true = supabase_admin.table("jobs").select("id", count="exact").eq("is_active", True).execute().count or 0
+        active_not_false = supabase_admin.table("jobs").select("id", count="exact").neq("is_active", False).execute().count or 0
+        return {
+            "total_jobs":          total,
+            "is_active_true":      active_true,
+            "is_active_not_false": active_not_false,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @router.post("/{job_id}/save")
 async def save_job(job_id: str, user=Depends(get_current_user)):
-    # Toggle save
     existing = (
         supabase_admin.table("saved_jobs")
         .select("id")
