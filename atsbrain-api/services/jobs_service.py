@@ -227,7 +227,7 @@ async def fetch_remotive_jobs(role: str = "") -> list[dict]:
     all_jobs = []
 
     async with httpx.AsyncClient(timeout=6) as client:
-        for category in categories[:2]:
+        for category in categories:
             try:
                 params: dict = {"category": category, "limit": 50}
                 if role:
@@ -262,6 +262,45 @@ async def fetch_remotive_jobs(role: str = "") -> list[dict]:
 
     logger.info(f"Remotive: fetched {len(all_jobs)} jobs for '{role}'")
     return all_jobs
+
+
+async def fetch_arbeitnow_jobs() -> list[dict]:
+    """Fetch remote tech jobs from Arbeitnow (free, no credentials needed)."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get("https://www.arbeitnow.com/api/job-board-api")
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        logger.warning(f"Arbeitnow fetch error: {e}")
+        return []
+
+    jobs = []
+    for j in data.get("data", [])[:60]:
+        title = j.get("title", "").strip()
+        desc = re.sub(r"<[^>]+>", " ", j.get("description", ""))[:2000].strip()
+        created = j.get("created_at")
+        posted = (
+            datetime.fromtimestamp(created, tz=timezone.utc).isoformat()
+            if created else None
+        )
+        jobs.append({
+            "external_id": f"arbeitnow_{j['slug']}",
+            "source":      "arbeitnow",
+            "title":       title,
+            "company":     j.get("company_name", ""),
+            "location":    j.get("location") or "Remote",
+            "description": desc,
+            "skills":      extract_skills_static(f"{title} {desc}"),
+            "apply_url":   j.get("url", ""),
+            "job_type":    "remote" if j.get("remote") else "full-time",
+            "posted_at":   posted,
+            "fetched_at":  datetime.now(timezone.utc).isoformat(),
+            "is_active":   True,
+        })
+
+    logger.info(f"Arbeitnow: fetched {len(jobs)} jobs")
+    return jobs
 
 
 async def fetch_linkedin_jobs(role: str, location: str = "India") -> list[dict]:

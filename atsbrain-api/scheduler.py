@@ -5,7 +5,7 @@ from loguru import logger
 from database import supabase_admin
 from services.jobs_service import (
     fetch_adzuna_jobs, fetch_linkedin_jobs,
-    fetch_google_jobs, fetch_remotive_jobs, upsert_jobs
+    fetch_google_jobs, fetch_remotive_jobs, fetch_arbeitnow_jobs, upsert_jobs
 )
 from datetime import datetime, timedelta, timezone
 
@@ -31,35 +31,34 @@ LOCATIONS = ["bangalore", "hyderabad", "mumbai", "delhi", "chennai", "pune"]
 
 
 async def refresh_jobs():
-    """Fetch fresh jobs from all APIs for all roles."""
+    """Fetch fresh jobs from all sources in parallel."""
     import asyncio
     logger.info("Cron: Starting job refresh...")
-    total = 0
 
-    for role in CRON_ROLES:
-        for location in LOCATIONS[:2]:   # bangalore + hyderabad first
-            try:
-                jobs = await fetch_adzuna_jobs(role, location)
-                saved = upsert_jobs(jobs)
-                total += saved
-                await asyncio.sleep(0.5)
-            except Exception as e:
-                logger.error(f"Cron error for {role}/{location}: {e}")
+    # All Adzuna role+location combos + free sources — all run concurrently
+    tasks = [
+        fetch_adzuna_jobs(role, location)
+        for role in CRON_ROLES
+        for location in LOCATIONS[:2]
+    ]
+    tasks += [fetch_remotive_jobs(), fetch_arbeitnow_jobs()]
 
-    # Remotive fallback if Adzuna produced nothing (e.g., credentials not set)
-    if total == 0:
-        try:
-            for role in CRON_ROLES[:4]:
-                jobs = await fetch_remotive_jobs(role)
-                total += upsert_jobs(jobs)
-        except Exception as e:
-            logger.error(f"Remotive cron error: {e}")
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    all_jobs: list[dict] = []
+    for r in results:
+        if isinstance(r, list):
+            all_jobs.extend(r)
+        elif isinstance(r, Exception):
+            logger.warning(f"Cron source error: {r}")
+
+    total = upsert_jobs(all_jobs)
 
     # Mark jobs older than 30 days as inactive
     cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     supabase_admin.table("jobs").update({"is_active": False}).lt("posted_at", cutoff).execute()
 
-    logger.info(f"✅ Cron complete: {total} jobs upserted")
+    logger.info(f"Cron complete: {total} jobs upserted from {len(all_jobs)} fetched")
 
 
 async def send_job_alerts():

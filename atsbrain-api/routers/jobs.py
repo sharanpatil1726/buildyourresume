@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from middleware import get_current_user
 from database import supabase_admin
 from services.jobs_service import (
-    fetch_adzuna_jobs, fetch_remotive_jobs, upsert_jobs, has_fresh_cache,
+    fetch_adzuna_jobs, fetch_remotive_jobs, fetch_arbeitnow_jobs,
+    upsert_jobs, has_fresh_cache,
 )
 import asyncio
 from loguru import logger
@@ -81,19 +82,35 @@ async def search_jobs(
     }
 
 
+# Roles fetched on every manual refresh (run in parallel — total time = slowest single call)
+_REFRESH_ROLES = [
+    "software engineer",
+    "python developer",
+    "react developer",
+    "data scientist",
+    "backend engineer",
+    "devops engineer",
+]
+
+
 @router.post("/refresh")
 async def refresh_jobs_now(user=Depends(get_current_user)):
-    """Manually fetch and insert jobs. Call once to seed an empty DB."""
-    try:
-        jobs = await fetch_adzuna_jobs("software engineer", "india")
-        if not jobs:
-            logger.info("Adzuna returned 0 jobs, falling back to Remotive")
-            jobs = await fetch_remotive_jobs()
-        inserted = upsert_jobs(jobs)
-        return {"fetched": len(jobs), "inserted": inserted, "source": "adzuna" if jobs else "remotive"}
-    except Exception as e:
-        logger.error(f"Manual refresh failed: {e}")
-        return {"error": str(e), "fetched": 0, "inserted": 0}
+    """Fetch jobs from all sources in parallel. Safe to call anytime."""
+    tasks = [fetch_adzuna_jobs(role, "india") for role in _REFRESH_ROLES]
+    tasks += [fetch_remotive_jobs(), fetch_arbeitnow_jobs()]
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    all_jobs: list[dict] = []
+    for r in results:
+        if isinstance(r, list):
+            all_jobs.extend(r)
+        elif isinstance(r, Exception):
+            logger.warning(f"Refresh source failed: {r}")
+
+    inserted = upsert_jobs(all_jobs)
+    logger.info(f"Manual refresh: fetched {len(all_jobs)}, inserted {inserted}")
+    return {"fetched": len(all_jobs), "inserted": inserted}
 
 
 @router.get("/status")
