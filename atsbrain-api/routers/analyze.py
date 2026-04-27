@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status as http_status
+from fastapi.responses import Response
 from middleware import get_current_user, get_current_profile
 from database import supabase_admin
 from models import AnalyzeRequest, CoverLetterRequest, VerifyUnlockRequest
@@ -6,8 +7,162 @@ from services.anthropic_service import analyze_resume, generate_cover_letter, ge
 from services.razorpay_service import create_order, verify_payment_signature
 from config import get_settings, SCAN_UNLOCK_AMOUNT
 from loguru import logger
+import io
+import re
 
 router = APIRouter()
+
+# ── Template colour palette ───────────────────────────────────────────────────
+
+_PALETTE: dict[str, str] = {
+    "ats-classic": "111827",  "ats-minimal": "374151",  "ats-navy": "1e3a5f",
+    "ats-clean":   "1e40af",  "ats-modern":  "7c3aed",  "ats-sharp": "0f172a",
+    "ats-slate":   "475569",  "ats-teal":    "0f766e",  "ats-stone": "44403c",
+    "ats-ink":     "312e81",  "std-violet":  "7c3aed",  "std-navy":  "1e3a5f",
+    "std-forest":  "065f46",  "std-teal":    "0f766e",  "std-charcoal": "1f2937",
+    "std-burgundy":"7f1d1d",  "std-cobalt":  "1d4ed8",  "std-gold":  "92400e",
+    "std-slate":   "334155",  "std-indigo":  "4338ca",  "basic-clean": "374151",
+    "basic-simple":"111827",  "basic-compact":"1f2937", "basic-academic":"1e3a5f",
+    "basic-entry": "374151",  "mod-violet":  "7c3aed",  "mod-navy":  "1e3a5f",
+    "mod-teal":    "0f766e",  "mod-slate":   "334155",  "mod-purple": "6d28d9",
+    "mod-cyan":    "0891b2",  "mod-emerald": "059669",  "mod-graphite":"374151",
+    "mod-rose":    "be185d",  "mod-amber":   "b45309",
+}
+
+# ── Resume text parser ────────────────────────────────────────────────────────
+
+_SECTION_RE = re.compile(
+    r"^(CONTACT|PROFILE|SUMMARY|OBJECTIVE|PROFESSIONAL|EXPERIENCE|WORK|EMPLOYMENT|"
+    r"EDUCATION|SKILL|TECHNICAL|CERTIF|PROJECT|AWARD|ACHIEVEMENT|LANGUAGE|REFERENCE|"
+    r"VOLUNTEER|INTEREST|ACTIVITY|PUBLICATION|RESEARCH|HONOR)",
+    re.IGNORECASE,
+)
+
+def _is_heading(line: str) -> bool:
+    t = line.strip()
+    if not t or len(t) > 60:
+        return False
+    if t == t.upper() and len(t) >= 3 and re.search(r"[A-Z]", t):
+        return True
+    clean = re.sub(r"[:\-_|]", "", t).strip()
+    return bool(_SECTION_RE.match(clean))
+
+def _parse_resume(text: str) -> dict:
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    if not lines:
+        return {"name": "", "contact": [], "sections": []}
+
+    name = lines[0]
+    body_start = len(lines)
+    for i in range(1, min(len(lines), 8)):
+        if _is_heading(lines[i]):
+            body_start = i
+            break
+
+    contact = lines[1:body_start]
+    sections: list[dict] = []
+    cur: dict | None = None
+    for line in lines[body_start:]:
+        if _is_heading(line):
+            if cur:
+                sections.append(cur)
+            cur = {"title": line, "lines": []}
+        elif cur is not None:
+            cur["lines"].append(line)
+    if cur:
+        sections.append(cur)
+
+    return {"name": name, "contact": contact, "sections": sections}
+
+# ── DOCX generator ────────────────────────────────────────────────────────────
+
+def _add_bottom_border(paragraph, hex_color: str) -> None:
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    pPr = paragraph._element.get_or_add_pPr()
+    pBdr = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), "6")
+    bottom.set(qn("w:space"), "2")
+    bottom.set(qn("w:color"), hex_color)
+    pBdr.append(bottom)
+    pPr.append(pBdr)
+
+def _create_docx(text: str, template_id: str, target_role: str) -> bytes:
+    from docx import Document
+    from docx.shared import Pt, RGBColor, Inches
+
+    primary_hex = _PALETTE.get(template_id, "111827")
+    primary_rgb = tuple(int(primary_hex[i:i+2], 16) for i in (0, 2, 4))
+
+    parsed = _parse_resume(text)
+    doc = Document()
+
+    for sec in doc.sections:
+        sec.top_margin    = Inches(0.8)
+        sec.bottom_margin = Inches(0.8)
+        sec.left_margin   = Inches(0.85)
+        sec.right_margin  = Inches(0.85)
+
+    # Remove default empty paragraph
+    for el in list(doc.paragraphs[0]._element.getparent()):
+        pass
+    if doc.paragraphs:
+        doc.paragraphs[0]._element.getparent().remove(doc.paragraphs[0]._element)
+
+    # Name
+    np_ = doc.add_paragraph()
+    np_.paragraph_format.space_after = Pt(3)
+    nr = np_.add_run(parsed["name"])
+    nr.bold = True
+    nr.font.size = Pt(22)
+    nr.font.color.rgb = RGBColor(*primary_rgb)
+
+    # Contact
+    if parsed["contact"]:
+        cp = doc.add_paragraph(" | ".join(parsed["contact"]))
+        cp.paragraph_format.space_after = Pt(6)
+        if cp.runs:
+            cp.runs[0].font.size = Pt(9)
+            cp.runs[0].font.color.rgb = RGBColor(100, 100, 100)
+
+    # Divider
+    div_p = doc.add_paragraph()
+    div_p.paragraph_format.space_after = Pt(2)
+    _add_bottom_border(div_p, primary_hex)
+
+    # Sections
+    for section in parsed["sections"]:
+        hp = doc.add_paragraph()
+        hp.paragraph_format.space_before = Pt(10)
+        hp.paragraph_format.space_after  = Pt(3)
+        hr = hp.add_run(section["title"].upper())
+        hr.bold = True
+        hr.font.size = Pt(10)
+        hr.font.color.rgb = RGBColor(*primary_rgb)
+        _add_bottom_border(hp, primary_hex)
+
+        for line in section["lines"]:
+            if not line.strip():
+                continue
+            is_bullet = line.strip().startswith(("-", "•", "*"))
+            content = line.strip().lstrip("-•* ").strip() if is_bullet else line.strip()
+            try:
+                p = doc.add_paragraph(style="List Bullet") if is_bullet else doc.add_paragraph()
+                if is_bullet:
+                    p.add_run(content)
+                else:
+                    p.add_run(line.strip())
+            except Exception:
+                p = doc.add_paragraph(content)
+            p.paragraph_format.space_after = Pt(1)
+            if p.runs:
+                p.runs[0].font.size = Pt(10)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
 settings = get_settings()
 
 FREE_FIELDS = {"keyword_score", "format_score", "content_score", "readability_score",
@@ -190,6 +345,55 @@ async def get_optimized_resume(scan_id: str, user=Depends(get_current_user), pro
         pass
 
     return {"text": optimized}
+
+
+@router.get("/{scan_id}/download/docx")
+async def download_docx(
+    scan_id: str,
+    template_id: str = "ats-classic",
+    user=Depends(get_current_user),
+    profile=Depends(get_current_profile),
+):
+    if profile["plan"] != "pro":
+        raise HTTPException(status_code=403, detail="Resume download requires Pro plan (₹299/month).")
+
+    scan = (
+        supabase_admin.table("scans")
+        .select("optimized_resume, result_json, target_role")
+        .eq("id", scan_id)
+        .eq("user_id", user.id)
+        .single()
+        .execute()
+    )
+    if not scan.data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    text = scan.data.get("optimized_resume")
+    if not text:
+        full = scan.data.get("result_json") or {}
+        missing = full.get("missing_keywords", [])
+        resume_text = full.get("_resume_text", "")
+        target_role = scan.data["target_role"]
+        try:
+            text = generate_optimized_resume(resume_text, target_role, missing)
+            supabase_admin.table("scans").update({"optimized_resume": text}).eq("id", scan_id).execute()
+        except Exception as e:
+            logger.error(f"Optimized resume generation for DOCX failed: {e}")
+            raise HTTPException(status_code=500, detail="Could not generate optimized resume")
+
+    try:
+        docx_bytes = _create_docx(text, template_id, scan.data["target_role"])
+    except Exception as e:
+        logger.error(f"DOCX creation failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not create DOCX file")
+
+    safe_role = re.sub(r"[^\w\s-]", "", scan.data["target_role"]).strip().replace(" ", "_")
+    filename = f"{safe_role}_{template_id}.docx"
+    return Response(
+        content=docx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/cover-letter")

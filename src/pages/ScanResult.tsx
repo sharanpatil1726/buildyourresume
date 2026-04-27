@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
-import { Lock, CheckCircle, Download, Zap, Star, BarChart, Award, TrendingUp, IndianRupee, Users, ClipboardList } from '../components/Icons'
+import { Lock, CheckCircle, Zap, Star, BarChart, Award, TrendingUp, IndianRupee, Users, ClipboardList, Download } from '../components/Icons'
+import TemplateSelector from '../components/TemplateSelector'
 
 declare global {
   interface Window { Razorpay: new (o: Record<string, unknown>) => { open(): void } }
@@ -56,7 +57,6 @@ export default function ScanResult() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [unlockLoading, setUnlockLoading] = useState(false)
-  const [optimizeLoading, setOptimizeLoading] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -99,43 +99,6 @@ export default function ScanResult() {
     }
   }
 
-  const handleDownload = async (type: 'txt' | 'doc') => {
-    if (!id) return
-    if (user?.plan !== 'pro') {
-      setError('Resume download requires Pro plan (₹299/month). Upgrade at /pricing.')
-      return
-    }
-    setOptimizeLoading(true)
-    try {
-      const res = await api.analyze.getOptimized(id)
-      const safeName = ((scan?.target_role as string) || 'resume').replace(/\s+/g, '_')
-      if (type === 'txt') {
-        const blob = new Blob([res.text], { type: 'text/plain;charset=utf-8' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url; a.download = `${safeName}_optimized.txt`
-        document.body.appendChild(a); a.click(); document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      } else {
-        const rtfLines = res.text
-          .split('\n')
-          .map((line: string) => line.replace(/\\/g, '\\\\').replace(/[{}]/g, '\\$&'))
-          .join('\\par\n')
-        const rtf = `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\froman\\fcharset0 Arial;}}\n{\\colortbl;\\red0\\green0\\blue0;}\n\\f0\\fs24\\sl360\\slmult1\n${rtfLines}\n}`
-        const blob = new Blob([rtf], { type: 'application/rtf' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url; a.download = `${safeName}_optimized.rtf`
-        document.body.appendChild(a); a.click(); document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      }
-    } catch {
-      setError('Could not generate optimized resume')
-    } finally {
-      setOptimizeLoading(false)
-    }
-  }
-
   if (loading) return <div className="page"><div className="loader-wrap"><div className="loader" /></div></div>
   if (!scan) return <div className="page"><div className="page-inner"><div className="alert alert-error">{error || 'Scan not found'}</div></div></div>
 
@@ -166,21 +129,14 @@ export default function ScanResult() {
               <CheckCircle size={13} /> Fully Unlocked
             </span>
           )}
-          {isUnlocked && user?.plan === 'pro' && (
-            <>
-              <button className="btn btn-accent btn-sm" onClick={() => handleDownload('txt')} disabled={optimizeLoading}
-                style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Download size={13} /> {optimizeLoading ? 'Generating…' : 'Download TXT'}
-              </button>
-              <button className="btn btn-outline btn-sm" onClick={() => handleDownload('doc')} disabled={optimizeLoading}
-                style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Download size={13} /> {optimizeLoading ? 'Generating…' : 'Download RTF/DOC'}
-              </button>
-            </>
-          )}
           {isUnlocked && user?.plan !== 'pro' && (
             <a href="/pricing" className="btn btn-gold btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <Star size={13} /> Pro to Download
+            </a>
+          )}
+          {isUnlocked && user?.plan === 'pro' && (
+            <a href="#resume-templates" className="btn btn-accent btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <Download size={13} /> Choose Template &amp; Download
             </a>
           )}
         </div>
@@ -379,6 +335,15 @@ export default function ScanResult() {
               </a>
             </div>
           )}
+        </div>
+
+        {/* Template selector — always shown (gated inside the component for non-Pro) */}
+        <div id="resume-templates">
+          <TemplateSelector
+            scanId={id!}
+            targetRole={scan.target_role as string}
+            isPro={user?.plan === 'pro'}
+          />
         </div>
       </div>
     </div>
