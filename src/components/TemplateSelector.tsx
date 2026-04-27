@@ -275,26 +275,31 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
     if (!resumeText) return
     if (!window.html2pdf) { setDlError('PDF generator not loaded. Please refresh.'); return }
     setDlLoading('pdf'); setDlError('')
+    const el = document.createElement('div')
     try {
       const html = buildResumeHtml(resumeText, selected)
-      const el = document.createElement('div')
-      el.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white'
+      el.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#ffffff'
       el.innerHTML = html
       document.body.appendChild(el)
+      // wait for browser to paint the element before html2canvas captures it
+      await new Promise(resolve => setTimeout(resolve, 200))
       await window.html2pdf()
         .set({
           margin: 0,
           filename: `${targetRole.replace(/\s+/g, '_')}_${selected.id}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+          html2canvas: {
+            scale: 2, useCORS: true, letterRendering: true,
+            scrollX: 0, scrollY: 0, windowWidth: 794,
+          },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
         .from(el)
         .save()
-      document.body.removeChild(el)
     } catch {
       setDlError('PDF generation failed. Please try again.')
     } finally {
+      if (document.body.contains(el)) document.body.removeChild(el)
       setDlLoading(null)
     }
   }
