@@ -278,7 +278,7 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
     try {
       const html = buildResumeHtml(resumeText, selected)
       const el = document.createElement('div')
-      el.style.cssText = 'position:fixed;left:-9999px;top:0;z-index:-1;width:794px'
+      el.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white'
       el.innerHTML = html
       document.body.appendChild(el)
       await window.html2pdf()
