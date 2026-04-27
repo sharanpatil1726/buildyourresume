@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
+import { ShieldCheck, RotateCcw, Zap, Mail, CreditCard, Smartphone, Building, Wallet, QrCode, Check } from '../components/Icons'
 
 declare global {
   interface Window {
@@ -135,8 +136,8 @@ export default function Pricing() {
             <ul className="plan-features">
               {FREE_FEATURES.map(f => <li key={f}>{f}</li>)}
             </ul>
-            <button className="btn btn-ghost btn-full" disabled>
-              {isPro ? 'Previous plan' : '✓ Current Plan'}
+            <button className="btn btn-ghost btn-full" disabled style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              {isPro ? 'Previous plan' : <><Check size={14} /> Current Plan</>}
             </button>
           </div>
 
@@ -154,7 +155,7 @@ export default function Pricing() {
               {PRO_FEATURES.map(f => <li key={f}>{f}</li>)}
             </ul>
             {isPro ? (
-              <button className="btn btn-outline btn-full" disabled>✓ Current Plan</button>
+              <button className="btn btn-outline btn-full" disabled style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Check size={14} /> Current Plan</button>
             ) : (
               <button
                 className="btn btn-primary btn-full"
@@ -171,15 +172,20 @@ export default function Pricing() {
         <div className="card" style={{ marginBottom: 20 }}>
           <p className="section-title">Payment Options</p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-            {['UPI', 'Credit / Debit Card', 'Net Banking', 'Wallet'].map(m => (
-              <span key={m} style={{
+            {([
+              { label: 'UPI',               Icon: Smartphone },
+              { label: 'Credit / Debit Card',Icon: CreditCard },
+              { label: 'Net Banking',        Icon: Building   },
+              { label: 'Wallet',             Icon: Wallet     },
+            ] as const).map(({ label, Icon }) => (
+              <span key={label} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '6px 14px', borderRadius: 20,
                 background: 'var(--primary-light)', color: 'var(--primary)',
                 fontSize: '.8rem', fontWeight: 600,
                 border: '1px solid var(--border)',
               }}>
-                {m === 'UPI' ? '📱' : m === 'Credit / Debit Card' ? '💳' : m === 'Net Banking' ? '🏦' : '👛'} {m}
+                <Icon size={14} /> {label}
               </span>
             ))}
           </div>
@@ -193,7 +199,7 @@ export default function Pricing() {
             onClick={() => setShowUPI(v => !v)}
             style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', color: 'var(--primary)', fontSize: '.82rem', fontWeight: 600, marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            📲 {showUPI ? 'Hide' : 'Show'} UPI / QR Pay directly
+            <QrCode size={14} /> {showUPI ? 'Hide' : 'Show'} UPI / QR Pay directly
           </button>
 
           {showUPI && (
@@ -204,7 +210,7 @@ export default function Pricing() {
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 background: 'white', flexShrink: 0, gap: 6,
               }}>
-                <div style={{ fontSize: '2.5rem' }}>📱</div>
+                <QrCode size={44} color="var(--primary)" />
                 <span style={{ fontSize: '.65rem', color: 'var(--muted)', textAlign: 'center', lineHeight: 1.4 }}>
                   Add your UPI QR image here
                 </span>
@@ -236,14 +242,14 @@ export default function Pricing() {
 
         {/* Trust badges */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>
-          {[
-            { icon: '🔒', title: 'Secure Payments', sub: 'Powered by Razorpay' },
-            { icon: '↩️', title: '30-Day Refund', sub: 'No questions asked' },
-            { icon: '⚡', title: 'Instant Access', sub: 'Activated immediately' },
-            { icon: '📧', title: 'Email Support', sub: 'support@atsbrain.in' },
-          ].map(b => (
+          {([
+            { Icon: ShieldCheck, title: 'Secure Payments', sub: 'Powered by Razorpay' },
+            { Icon: RotateCcw,   title: '30-Day Refund',   sub: 'No questions asked' },
+            { Icon: Zap,         title: 'Instant Access',  sub: 'Activated immediately' },
+            { Icon: Mail,        title: 'Email Support',   sub: 'support@atsbrain.in' },
+          ] as const).map(b => (
             <div key={b.title} style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10 }}>
-              <div style={{ fontSize: '1.6rem', marginBottom: 6 }}>{b.icon}</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6, color: 'var(--primary)' }}><b.Icon size={22} /></div>
               <div style={{ fontWeight: 700, fontSize: '.82rem', color: 'var(--text)' }}>{b.title}</div>
               <div style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 2 }}>{b.sub}</div>
             </div>

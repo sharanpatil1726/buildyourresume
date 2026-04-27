@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
+import { Lock, CheckCircle, Download, Zap, Star, BarChart, Award, TrendingUp, IndianRupee, Users, ClipboardList } from '../components/Icons'
 
 declare global {
   interface Window { Razorpay: new (o: Record<string, unknown>) => { open(): void } }
@@ -154,19 +155,33 @@ export default function ScanResult() {
           <button className="btn btn-ghost btn-sm" onClick={() => navigate('/dashboard')}>← Dashboard</button>
           <button className="btn btn-ghost btn-sm" onClick={() => navigate('/analyze')}>+ New Scan</button>
           {!isUnlocked && (
-            <button className="btn btn-gold btn-sm" onClick={handleUnlock} disabled={unlockLoading}>
-              {unlockLoading ? 'Opening payment…' : '🔒 Unlock Full Report — ₹49'}
+            <button className="btn btn-gold btn-sm" onClick={handleUnlock} disabled={unlockLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Lock size={13} />
+              {unlockLoading ? 'Opening payment…' : 'Unlock Full Report — ₹49'}
             </button>
           )}
-          {isUnlocked && <span style={{ fontSize: '.8rem', color: 'var(--success)', fontWeight: 700, padding: '6px 12px', background: 'var(--success-light)', borderRadius: 6 }}>✅ Fully Unlocked</span>}
+          {isUnlocked && (
+            <span style={{ fontSize: '.8rem', color: 'var(--success)', fontWeight: 700, padding: '6px 12px', background: 'var(--success-light)', borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <CheckCircle size={13} /> Fully Unlocked
+            </span>
+          )}
           {isUnlocked && user?.plan === 'pro' && (
             <>
-              <button className="btn btn-accent btn-sm" onClick={() => handleDownload('txt')} disabled={optimizeLoading}>{optimizeLoading ? '⏳' : '📄 Download TXT'}</button>
-              <button className="btn btn-outline btn-sm" onClick={() => handleDownload('doc')} disabled={optimizeLoading}>{optimizeLoading ? '⏳' : '📝 Download RTF/DOC'}</button>
+              <button className="btn btn-accent btn-sm" onClick={() => handleDownload('txt')} disabled={optimizeLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Download size={13} /> {optimizeLoading ? 'Generating…' : 'Download TXT'}
+              </button>
+              <button className="btn btn-outline btn-sm" onClick={() => handleDownload('doc')} disabled={optimizeLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Download size={13} /> {optimizeLoading ? 'Generating…' : 'Download RTF/DOC'}
+              </button>
             </>
           )}
           {isUnlocked && user?.plan !== 'pro' && (
-            <a href="/pricing" className="btn btn-gold btn-sm" style={{ textDecoration: 'none' }}>⭐ Pro to Download</a>
+            <a href="/pricing" className="btn btn-gold btn-sm" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <Star size={13} /> Pro to Download
+            </a>
           )}
         </div>
 
@@ -184,8 +199,8 @@ export default function ScanResult() {
           <div className="card" style={{ background: 'linear-gradient(135deg,#f5f3ff,white)' }}>
             <p className="section-title">Score Breakdown</p>
             {!isUnlocked && (
-              <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 10, fontStyle: 'italic' }}>
-                🔒 Unlock full report to see exact scores
+              <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginBottom: 10, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Lock size={12} /> Unlock full report to see exact scores
               </p>
             )}
             <ScoreBar label="Keywords Match" value={r.keyword_score as number} barClass="bar-violet" blurValue={!isUnlocked} />
@@ -263,12 +278,12 @@ export default function ScanResult() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16, marginBottom: 16 }}>
               <div className="card card-sm" style={{ background: 'linear-gradient(135deg,#fffbeb,white)' }}>
-                <p className="section-title">Quick Fixes ⚡</p>
+                <p className="section-title">Quick Fixes</p>
                 <ul className="bullet-list check-list">{safeArr(r.quick_fixes).map((s, i) => <li key={i}>{s}</li>)}</ul>
               </div>
               <div className="card card-sm" style={{ background: 'linear-gradient(135deg,#f5f3ff,white)' }}>
                 <p className="section-title">Top Recommendations</p>
-                {r.top_recommendation && <div style={{ padding: '10px 12px', background: 'var(--primary-light)', borderRadius: 8, marginBottom: 10, fontSize: '.875rem', fontWeight: 600 }}>🥇 {r.top_recommendation as string}</div>}
+                {r.top_recommendation && <div style={{ padding: '10px 12px', background: 'var(--primary-light)', borderRadius: 8, marginBottom: 10, fontSize: '.875rem', fontWeight: 600 }}>{r.top_recommendation as string}</div>}
                 <ul className="bullet-list check-list">{safeArr(r.secondary_recommendations).map((s, i) => <li key={i}>{s}</li>)}</ul>
               </div>
             </div>
@@ -280,7 +295,7 @@ export default function ScanResult() {
 
             {safeArr(r.interview_questions).length > 0 && (
               <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg,#ecfdf5,white)' }}>
-                <p className="section-title">Common Interview Questions 🎤</p>
+                <p className="section-title">Common Interview Questions</p>
                 <ol style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {safeArr(r.interview_questions).map((q, i) => (
                     <li key={i} style={{ display: 'flex', gap: 10, fontSize: '.875rem' }}>
@@ -294,7 +309,7 @@ export default function ScanResult() {
 
             {salaryNeg.expected_range && (
               <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg,#fffbeb,white)' }}>
-                <p className="section-title">Salary Negotiation 💰</p>
+                <p className="section-title">Salary Negotiation</p>
                 <div style={{ display: 'inline-block', padding: '8px 18px', background: 'var(--gold-light)', border: '2px solid var(--gold)', borderRadius: 8, fontWeight: 800, color: 'var(--gold)', fontSize: '1.1rem', marginBottom: 14 }}>
                   {salaryNeg.expected_range as string}
                 </div>
@@ -304,7 +319,7 @@ export default function ScanResult() {
 
             {Object.keys(marketDemand).length > 0 && (
               <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg,#f5f3ff,white)' }}>
-                <p className="section-title">2025 Market Analysis 📊</p>
+                <p className="section-title">2025 Market Analysis</p>
                 <div className="market-row" style={{ marginBottom: 14 }}>
                   {marketDemand.role_demand && <div className="market-item"><div className="market-item-value">{marketDemand.role_demand as string}</div><div className="market-item-label">Demand</div></div>}
                   {marketDemand.avg_salary_range && <div className="market-item"><div className="market-item-value" style={{ fontSize: '.8rem' }}>{marketDemand.avg_salary_range as string}</div><div className="market-item-label">Avg Salary</div></div>}
@@ -316,7 +331,7 @@ export default function ScanResult() {
 
             {Object.keys(roleGuide).length > 0 && (
               <div className="card" style={{ marginBottom: 16, background: 'linear-gradient(135deg,#ecfeff,white)' }}>
-                <p className="section-title">Role-Specific Guide 🗺</p>
+                <p className="section-title">Role-Specific Guide</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
                   {roleGuide.key_responsibilities && <div>
                     <p style={{ fontWeight: 700, fontSize: '.8rem', color: 'var(--accent)', marginBottom: 6 }}>Key Responsibilities</p>
@@ -334,30 +349,33 @@ export default function ScanResult() {
 
           {!isUnlocked && (
             <div className="lock-overlay">
-              <div className="lock-icon">🔒</div>
+              <div className="lock-icon"><Lock size={32} color="var(--gold)" /></div>
               <div className="lock-title">Unlock Full Analysis</div>
               <div className="lock-price">₹49 <span style={{ fontSize: '.55em', fontWeight: 400, color: 'var(--muted)' }}>one-time</span></div>
               <ul style={{ textAlign: 'left', listStyle: 'none', padding: '0 8px', margin: '10px 0 16px', lineHeight: 1.9, fontSize: '.85rem' }}>
                 {[
-                  '📊 Overall ATS Score',
-                  '⚡ Weaknesses & Quick Fixes',
-                  '🎤 Interview Questions (role-specific)',
-                  '💰 Salary Negotiation Tips',
-                  '📈 2025 Market Analysis',
-                  '🗺 Role-Specific Career Guide',
-                  '📄 Optimised Resume Download',
-                ].map(item => (
-                  <li key={item} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: '.8em' }}>✓</span> {item}
+                  { Icon: BarChart,     text: 'Overall ATS Score' },
+                  { Icon: Zap,          text: 'Weaknesses & Quick Fixes' },
+                  { Icon: Users,        text: 'Interview Questions (role-specific)' },
+                  { Icon: IndianRupee,  text: 'Salary Negotiation Tips' },
+                  { Icon: TrendingUp,   text: '2025 Market Analysis' },
+                  { Icon: ClipboardList,text: 'Role-Specific Career Guide' },
+                  { Icon: Download,     text: 'Optimised Resume Download' },
+                ].map(({ Icon, text }) => (
+                  <li key={text} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ color: 'var(--gold)', flexShrink: 0 }}><Icon size={14} /></span> {text}
                   </li>
                 ))}
               </ul>
-              <button className="btn btn-gold btn-lg" onClick={handleUnlock} disabled={unlockLoading} style={{ marginTop: 4 }}>
-                {unlockLoading ? '⏳ Opening payment…' : '🔓 Unlock for ₹49'}
+              <button className="btn btn-gold btn-lg" onClick={handleUnlock} disabled={unlockLoading}
+                style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                {unlockLoading
+                  ? 'Opening payment…'
+                  : <><Award size={15} /> Unlock for ₹49</>}
               </button>
               <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 8 }}>One-time · Instant · No subscription</p>
               <a href="/pricing" style={{ fontSize: '.75rem', color: 'var(--primary)', marginTop: 4, display: 'block' }}>
-                Or upgrade to Pro for unlimited unlocks →
+                Or upgrade to Pro for unlimited unlocks
               </a>
             </div>
           )}

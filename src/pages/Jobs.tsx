@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import {
+  MapPin, IndianRupee, Bookmark, BookmarkFill,
+  Search, Briefcase, RefreshCw, ExternalLink,
+  Star, Clock, ArrowRight, Zap,
+} from '../components/Icons'
 
 interface Job {
   id: string
@@ -18,7 +23,7 @@ interface Job {
 
 function formatSalary(min?: number, max?: number): string {
   if (!min && !max) return ''
-  const fmt = (n: number) => `₹${(n / 100000).toFixed(0)}L`
+  const fmt = (n: number) => `${(n / 100000).toFixed(0)}L`
   if (min && max) return `${fmt(min)}–${fmt(max)} /yr`
   if (min) return `${fmt(min)}+ /yr`
   return `Up to ${fmt(max!)} /yr`
@@ -147,24 +152,26 @@ export default function Jobs() {
                   <button
                     style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 'inherit', padding: '0 0 0 8px', fontWeight: 600 }}
                     onClick={() => { localStorage.removeItem('atsbrain_target_role'); setRole(''); search(1, '') }}
-                  >Clear ×</button>
+                  >Clear &times;</button>
                 </>
               : 'Fresher to Senior — jobs across India updated every 2 hours'}
           </p>
         </div>
 
-        {/* Pro badge / upgrade prompt */}
+        {/* Pro banner */}
         {!isPro && (
           <div className="alert alert-gold" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            <span>⭐ <strong>Pro plan</strong> — unlock one-click job apply + email alerts</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Star size={14} /> <strong>Pro plan</strong> — one-click job apply + email alerts
+            </span>
             <a href="/pricing" style={{ color: 'var(--gold)', fontWeight: 700, textDecoration: 'none', fontSize: '.82rem', border: '1px solid var(--gold)', borderRadius: 6, padding: '4px 12px' }}>
-              Upgrade ₹299/mo →
+              Upgrade ₹299/mo
             </a>
           </div>
         )}
 
         {/* Tabs */}
-        <div className="tabs" style={{ marginBottom: 16 }}>
+        <div className="tabs" style={{ marginBottom: 20 }}>
           <button className={`tab-btn ${tab === 'search' ? 'active' : ''}`} onClick={() => switchTab('search')}>Search Jobs</button>
           <button className={`tab-btn ${tab === 'saved' ? 'active' : ''}`} onClick={() => switchTab('saved')}>Saved Jobs</button>
         </div>
@@ -188,16 +195,20 @@ export default function Jobs() {
                 onChange={e => { const val = e.target.value || 'india'; setLocation(val) }}
                 onKeyDown={e => e.key === 'Enter' && search(1)}
               />
-              <button className="btn btn-primary" onClick={() => search(1)} disabled={loading}>
+              <button className="btn btn-primary" onClick={() => search(1)} disabled={loading}
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Search size={14} />
                 {loading ? 'Searching…' : 'Search'}
               </button>
-              <button className="btn btn-outline" onClick={seedJobs} disabled={loading} title="Fetch latest jobs from job boards">
-                {loading ? 'Loading…' : '↻ Fetch Jobs'}
+              <button className="btn btn-outline" onClick={seedJobs} disabled={loading}
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }} title="Fetch latest jobs from job boards">
+                <RefreshCw size={14} />
+                {loading ? 'Loading…' : 'Fetch Jobs'}
               </button>
             </div>
 
             {/* City pills */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
               {CITIES.map(city => {
                 const val = city === 'All India' ? 'india' : city
                 const isActive = location === val
@@ -221,11 +232,14 @@ export default function Jobs() {
         )}
 
         {error && <div className="alert alert-error">{error}</div>}
+
         {applyError && (
           <div className="alert alert-gold" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <span>⭐ {applyError}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Star size={14} /> {applyError}
+            </span>
             <a href="/pricing" style={{ color: 'var(--gold)', fontWeight: 700, textDecoration: 'none', fontSize: '.82rem', border: '1px solid var(--gold)', borderRadius: 6, padding: '3px 10px' }}>
-              Upgrade →
+              Upgrade
             </a>
           </div>
         )}
@@ -234,7 +248,11 @@ export default function Jobs() {
           <div className="loader-wrap"><div className="loader" /></div>
         ) : displayJobs.length === 0 ? (
           <div className="empty">
-            <div className="empty-icon">{tab === 'saved' ? '🔖' : '🔍'}</div>
+            <div className="empty-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              {tab === 'saved'
+                ? <Bookmark size={40} color="var(--muted)" />
+                : <Search size={40} color="var(--muted)" />}
+            </div>
             <h3 style={{ marginBottom: 8 }}>
               {tab === 'saved' ? 'No saved jobs' : 'No jobs found'}
             </h3>
@@ -257,8 +275,8 @@ export default function Jobs() {
         ) : (
           <>
             {tab === 'search' && (
-              <p style={{ color: 'var(--muted)', fontSize: '.85rem', marginBottom: 14 }}>
-                {total.toLocaleString()} jobs found
+              <p style={{ color: 'var(--muted)', fontSize: '.85rem', marginBottom: 16 }}>
+                <strong style={{ color: 'var(--text)' }}>{total.toLocaleString()}</strong> jobs found
                 {!roleMatched && role && (
                   <span style={{ color: 'var(--warning)', marginLeft: 8 }}>
                     — no exact matches for &ldquo;{role}&rdquo;, showing available jobs
@@ -270,64 +288,74 @@ export default function Jobs() {
             <div className="jobs-grid">
               {displayJobs.map(job => (
                 <div key={job.id} className="job-card">
-                  {/* Company logo */}
+
+                  {/* Logo */}
                   <div className="job-logo">
                     {job.company?.[0]?.toUpperCase() ?? '?'}
                   </div>
 
-                  {/* Job info */}
-                  <div className="job-info">
-                    <div className="job-title">{job.title}</div>
-                    <div className="job-company">{job.company}</div>
-                    <div className="job-location">
-                      <span style={{ marginRight: 4 }}>📍</span>{job.location || 'India'}
+                  {/* Main content */}
+                  <div className="job-body">
+                    <div className="job-header-row">
+                      <div className="job-title-block">
+                        <div className="job-title">{job.title}</div>
+                        <div className="job-company">{job.company}</div>
+                      </div>
+                      <div className="job-actions">
+                        <button
+                          className={`btn btn-sm ${saved.has(job.id) ? 'btn-primary' : 'btn-ghost'}`}
+                          onClick={() => toggleSave(job.id)}
+                          title={saved.has(job.id) ? 'Remove from saved' : 'Save job'}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                        >
+                          {saved.has(job.id)
+                            ? <><BookmarkFill size={13} /> Saved</>
+                            : <><Bookmark size={13} /> Save</>}
+                        </button>
+                        {isPro ? (
+                          <a
+                            href={job.apply_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-primary btn-sm"
+                            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}
+                            onClick={() => api.jobs.apply(job.id).catch(() => {})}
+                          >
+                            Apply <ExternalLink size={12} />
+                          </a>
+                        ) : (
+                          <button
+                            className="btn btn-gold btn-sm"
+                            onClick={() => trackApply(job.id, job.apply_url)}
+                            title="Pro feature — upgrade to apply"
+                            style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                          >
+                            <Zap size={12} /> Apply
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className="job-meta">
+
+                    <div className="job-meta-row">
+                      <span className="job-location-tag">
+                        <MapPin size={12} /> {job.location || 'India'}
+                      </span>
                       {formatSalary(job.salary_min, job.salary_max) && (
                         <span className="job-meta-tag salary">
-                          💰 {formatSalary(job.salary_min, job.salary_max)}
+                          <IndianRupee size={12} />
+                          {formatSalary(job.salary_min, job.salary_max)}
                         </span>
                       )}
                       {job.posted_at && (
-                        <span className="job-meta-tag">{timeAgo(job.posted_at)}</span>
+                        <span className="job-meta-tag">
+                          <Clock size={12} /> {timeAgo(job.posted_at)}
+                        </span>
                       )}
                       <span className="job-meta-tag source">{job.source}</span>
                     </div>
+
                     {job.description && (
                       <p className="job-desc">{job.description}</p>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="job-actions">
-                    <button
-                      className={`btn btn-sm ${saved.has(job.id) ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={() => toggleSave(job.id)}
-                      title={saved.has(job.id) ? 'Unsave' : 'Save'}
-                      style={{ minWidth: 64 }}
-                    >
-                      {saved.has(job.id) ? '🔖 Saved' : '🔖 Save'}
-                    </button>
-                    {isPro ? (
-                      <a
-                        href={job.apply_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-primary btn-sm"
-                        style={{ textDecoration: 'none', minWidth: 64, textAlign: 'center' }}
-                        onClick={() => api.jobs.apply(job.id).catch(() => {})}
-                      >
-                        Apply →
-                      </a>
-                    ) : (
-                      <button
-                        className="btn btn-gold btn-sm"
-                        onClick={() => trackApply(job.id, job.apply_url)}
-                        style={{ minWidth: 64 }}
-                        title="Pro feature — upgrade to apply"
-                      >
-                        ⭐ Apply
-                      </button>
                     )}
                   </div>
                 </div>
@@ -335,10 +363,20 @@ export default function Jobs() {
             </div>
 
             {tab === 'search' && pages > 1 && (
-              <div className="pagination" style={{ marginTop: 24 }}>
+              <div className="pagination" style={{ marginTop: 28 }}>
+                {page > 1 && (
+                  <button onClick={() => search(page - 1)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    &lsaquo;
+                  </button>
+                )}
                 {Array.from({ length: Math.min(pages, 7) }, (_, i) => i + 1).map(p => (
                   <button key={p} className={p === page ? 'active' : ''} onClick={() => search(p)}>{p}</button>
                 ))}
+                {page < pages && (
+                  <button onClick={() => search(page + 1)} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    &rsaquo;
+                  </button>
+                )}
               </div>
             )}
           </>

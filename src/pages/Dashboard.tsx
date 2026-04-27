@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { api } from '../lib/api'
+import { FileText, Send, Users, Award, Target, Briefcase, ClipboardList, Zap, Lock, CheckCircle, StarFill, Star } from '../components/Icons'
 
 interface Scan { id: string; target_role: string; ats_score: number; experience_level: string; created_at: string; is_unlocked: boolean }
 interface Stats { total: number; applied: number; interview: number; offer: number }
@@ -14,7 +15,9 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
     <div className="star-rating">
       {[1, 2, 3, 4, 5].map(n => (
         <button key={n} type="button" className="star-btn" onClick={() => onChange(n)}>
-          {n <= value ? '⭐' : '☆'}
+          {n <= value
+            ? <StarFill size={20} color="var(--gold)" />
+            : <Star size={20} color="var(--muted)" />}
         </button>
       ))}
     </div>
@@ -72,20 +75,20 @@ export default function Dashboard() {
     <div className="page">
       <div className="page-inner">
         <h1 className="page-title">
-          Welcome back{user?.email ? `, ${user.email.split('@')[0]}` : ''}! 👋
+          Welcome back{user?.email ? `, ${user.email.split('@')[0]}` : ''}!
         </h1>
         <p className="page-sub">Your career command centre. Let's land that job.</p>
 
         {/* Stats */}
         <div className="stats-grid">
-          {[
-            { val: scans.length, label: 'Resume Scans', icon: '📄' },
-            { val: stats?.applied ?? 0, label: 'Applications', icon: '📤' },
-            { val: stats?.interview ?? 0, label: 'Interviews', icon: '🎯' },
-            { val: stats?.offer ?? 0, label: 'Offers', icon: '🏆' },
-          ].map(s => (
+          {([
+            { val: scans.length, label: 'Resume Scans', Icon: FileText },
+            { val: stats?.applied ?? 0, label: 'Applications', Icon: Send },
+            { val: stats?.interview ?? 0, label: 'Interviews', Icon: Users },
+            { val: stats?.offer ?? 0, label: 'Offers', Icon: Award },
+          ] as const).map(s => (
             <div key={s.label} className="stat-card">
-              <div style={{ fontSize: '1.6rem', marginBottom: 4 }}>{s.icon}</div>
+              <div style={{ marginBottom: 6, color: 'var(--primary)' }}><s.Icon size={22} /></div>
               <div className="stat-value">{s.val}</div>
               <div className="stat-label">{s.label}</div>
             </div>
@@ -101,7 +104,7 @@ export default function Dashboard() {
             </div>
             {scans.length === 0 ? (
               <div className="empty">
-                <div className="empty-icon">📄</div>
+                <div className="empty-icon"><FileText size={40} color="var(--muted)" /></div>
                 <h3>No scans yet</h3>
                 <p>Upload your resume and get your ATS score instantly.</p>
                 <br />
@@ -125,8 +128,8 @@ export default function Dashboard() {
                     </div>
                     <div style={{ fontSize: '.75rem', flexShrink: 0 }}>
                       {s.is_unlocked
-                        ? <span style={{ color: 'var(--success)', fontWeight: 700 }}>✓ Unlocked</span>
-                        : <span style={{ color: 'var(--gold)', fontWeight: 600 }}>🔒 Free</span>}
+                        ? <span style={{ color: 'var(--success)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}><CheckCircle size={13} /> Unlocked</span>
+                        : <span style={{ color: 'var(--gold)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3 }}><Lock size={13} /> Free</span>}
                     </div>
                   </div>
                 ))}
@@ -140,23 +143,23 @@ export default function Dashboard() {
               <span className="card-title">Quick Actions</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { to: '/analyze', icon: '🎯', label: 'Analyze Resume', desc: 'Get your ATS score + insights', gradient: 'linear-gradient(135deg,#f5f3ff,#ede9fe)' },
-                { to: '/jobs',    icon: '💼', label: 'Find Jobs',      desc: 'Live jobs across India',        gradient: 'linear-gradient(135deg,#ecfeff,#cffafe)' },
-                { to: '/tracker', icon: '📋', label: 'Track Applications', desc: 'Stay on top of your pipeline', gradient: 'linear-gradient(135deg,#ecfdf5,#d1fae5)' },
-                { to: '/pricing', icon: '⚡', label: 'Plans & Pricing', desc: 'Pro plan from ₹749/month',     gradient: 'linear-gradient(135deg,#fffbeb,#fef3c7)' },
-              ].map(a => (
+              {([
+                { to: '/analyze', Icon: Target,       label: 'Analyze Resume',      desc: 'Get your ATS score + insights',   gradient: 'linear-gradient(135deg,#f5f3ff,#ede9fe)', iconColor: 'var(--primary)' },
+                { to: '/jobs',    Icon: Briefcase,    label: 'Find Jobs',           desc: 'Live jobs across India',          gradient: 'linear-gradient(135deg,#ecfeff,#cffafe)', iconColor: 'var(--accent)' },
+                { to: '/tracker', Icon: ClipboardList,label: 'Track Applications',  desc: 'Stay on top of your pipeline',    gradient: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', iconColor: 'var(--success)' },
+                { to: '/pricing', Icon: Zap,          label: 'Plans & Pricing',     desc: 'Pro plan from ₹299/month',        gradient: 'linear-gradient(135deg,#fffbeb,#fef3c7)', iconColor: 'var(--gold)' },
+              ] as const).map(a => (
                 <Link key={a.to} to={a.to}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', textDecoration: 'none', color: 'inherit', transition: 'all .15s', background: a.gradient }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-md)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; (e.currentTarget as HTMLElement).style.transform = 'none' }}
                 >
-                  <span style={{ fontSize: '1.6rem' }}>{a.icon}</span>
+                  <span style={{ color: a.iconColor }}><a.Icon size={22} /></span>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: '.9rem' }}>{a.label}</div>
                     <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{a.desc}</div>
                   </div>
-                  <span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: '.9rem' }}>→</span>
+                  <span style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: '.85rem' }}>›</span>
                 </Link>
               ))}
             </div>
@@ -170,7 +173,9 @@ export default function Dashboard() {
             <div className="testimonial-grid">
               {testimonials.slice(0, 6).map((t, i) => (
                 <div key={i} className="testimonial-card">
-                  <div className="testimonial-stars">{'⭐'.repeat(t.rating)}</div>
+                  <div className="testimonial-stars" style={{ display: 'flex', gap: 2 }}>
+                    {Array.from({ length: t.rating }).map((_, i) => <StarFill key={i} size={14} color="var(--gold)" />)}
+                  </div>
                   <p className="testimonial-text">"{t.message}"</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div className="avatar-circle">{t.user_name[0].toUpperCase()}</div>
@@ -191,7 +196,7 @@ export default function Dashboard() {
         <div className="card" style={{ background: 'linear-gradient(135deg, var(--primary-light), white)' }}>
           <p className="section-title">Share Your Experience</p>
           {fbSuccess ? (
-            <div className="alert alert-success">🎉 Thank you! Your feedback is now live on the site.</div>
+            <div className="alert alert-success">Thank you! Your feedback is now live on the site.</div>
           ) : (
             <form onSubmit={handleFeedback}>
               {fbError && <div className="alert alert-error">{fbError}</div>}
@@ -214,7 +219,7 @@ export default function Dashboard() {
                 <StarRating value={fbRating} onChange={setFbRating} />
               </div>
               <button className="btn btn-primary" type="submit" disabled={fbLoading}>
-                {fbLoading ? 'Submitting…' : '🚀 Share Feedback'}
+                {fbLoading ? 'Submitting…' : 'Share Feedback'}
               </button>
             </form>
           )}

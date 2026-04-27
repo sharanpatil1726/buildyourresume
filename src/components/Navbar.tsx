@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import { FileText, Briefcase, BarChart, ChevronDown, Zap, LogOut } from './Icons'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
@@ -36,7 +37,7 @@ export default function Navbar() {
           onClick={() => setOpen(v => !v)}
           style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'inherit' }}
         >
-          Tools <span style={{ fontSize: '.65em', opacity: 0.75, marginTop: 1 }}>▾</span>
+          Tools <ChevronDown size={12} style={{ opacity: 0.7 }} />
         </button>
         {open && (
           <div style={{
@@ -50,21 +51,21 @@ export default function Navbar() {
               textDecoration: 'none', fontSize: '.875rem', color: isActive ? 'var(--primary)' : 'var(--text)',
               fontWeight: isActive ? 700 : 500, background: isActive ? 'var(--primary-light)' : 'transparent',
             })}>
-              📄 Analyze Resume
+              <FileText size={15} /> Analyze Resume
             </NavLink>
             <NavLink to="/jobs" onClick={() => setOpen(false)} style={({ isActive }) => ({
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
               textDecoration: 'none', fontSize: '.875rem', color: isActive ? 'var(--primary)' : 'var(--text)',
               fontWeight: isActive ? 700 : 500, background: isActive ? 'var(--primary-light)' : 'transparent',
             })}>
-              💼 Live Jobs
+              <Briefcase size={15} /> Live Jobs
             </NavLink>
             <NavLink to="/tracker" onClick={() => setOpen(false)} style={({ isActive }) => ({
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px',
               textDecoration: 'none', fontSize: '.875rem', color: isActive ? 'var(--primary)' : 'var(--text)',
               fontWeight: isActive ? 700 : 500, background: isActive ? 'var(--primary-light)' : 'transparent',
             })}>
-              📊 App Tracker
+              <BarChart size={15} /> App Tracker
             </NavLink>
           </div>
         )}
@@ -73,9 +74,13 @@ export default function Navbar() {
       <div className="navbar-right">
         {user?.plan && <span className={`plan-badge ${planClass}`}>{user.plan}</span>}
         {user?.plan === 'free' && (
-          <NavLink to="/pricing" className="btn btn-primary btn-sm">Upgrade ⚡</NavLink>
+          <NavLink to="/pricing" className="btn btn-primary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Zap size={13} /> Upgrade
+          </NavLink>
         )}
-        <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Logout</button>
+        <button className="btn btn-ghost btn-sm" onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <LogOut size={13} /> Logout
+        </button>
       </div>
     </nav>
   )
