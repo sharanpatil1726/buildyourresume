@@ -1,16 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Download } from './Icons'
-
-declare global {
-  interface Window {
-    html2pdf: () => HtmlToPdfBuilder
-  }
-}
-type HtmlToPdfBuilder = {
-  set(o: Record<string, unknown>): HtmlToPdfBuilder
-  from(el: HTMLElement): HtmlToPdfBuilder
-  save(): Promise<void>
-}
 
 interface Tpl {
   id: string; name: string; category: string
@@ -67,6 +56,32 @@ const TEMPLATES: Tpl[] = [
   { id: 'mod-amber',    name: 'Amber',         category: 'modern',   layout: 'single',  primary: '#b45309', headerBg: '#92400e', headerText: '#fffbeb' },
 ]
 
+// ── Dummy resume for template previews ────────────────────────────────────────
+
+const DUMMY = `Alex Johnson
+alex.johnson@email.com  |  +91 98765 43210  |  Mumbai, India  |  linkedin.com/in/alexj
+PROFESSIONAL SUMMARY
+Results-driven Software Engineer with 5+ years building scalable web applications and APIs. Strong expertise in React, Node.js, Python and AWS cloud services.
+EXPERIENCE
+Senior Software Engineer  —  TechCorp India, Mumbai  |  2021 - Present
+- Led microservices architecture migration reducing API latency by 40%
+- Mentored team of 4 junior engineers and ran weekly code reviews
+- Shipped 3 zero-downtime product features serving 200K+ users
+Software Engineer  —  StartupXYZ, Bangalore  |  2019 - 2021
+- Built RESTful APIs handling 100K+ daily active users with Node.js
+- Implemented CI/CD pipelines cutting deployment time by 60%
+- Contributed to open-source library with 2K+ GitHub stars
+EDUCATION
+B.Tech in Computer Science  —  IIT Mumbai  |  2015 - 2019
+GPA 8.7/10  |  Dean's List three consecutive years
+SKILLS
+Languages: JavaScript, TypeScript, Python, Java, SQL
+Frameworks: React, Node.js, FastAPI, Express, Spring Boot
+Tools: Git, Docker, Kubernetes, AWS, PostgreSQL, Redis
+CERTIFICATIONS
+AWS Solutions Architect Associate  —  Amazon Web Services, 2022
+Google Professional Cloud Developer  —  Google, 2023`
+
 // ── Resume parser ─────────────────────────────────────────────────────────────
 
 interface Section { title: string; lines: string[] }
@@ -114,7 +129,7 @@ function parseResume(text: string): Parsed {
   return { name, contact: finalContact, sections }
 }
 
-// ── HTML renderer for PDF ─────────────────────────────────────────────────────
+// ── HTML renderer ─────────────────────────────────────────────────────────────
 
 function esc(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -178,61 +193,37 @@ function buildResumeHtml(text: string, tpl: Tpl): string {
   return tpl.layout === 'sidebar' ? buildSidebarHtml(parsed, tpl) : buildSingleHtml(parsed, tpl)
 }
 
+// Pre-compute all thumbnail HTMLs once at module load (avoids re-building on every render)
+const THUMB_HTMLS: Record<string, string> = Object.fromEntries(
+  TEMPLATES.map(tpl => [tpl.id, buildResumeHtml(DUMMY, tpl)])
+)
+
 // ── Thumbnail ─────────────────────────────────────────────────────────────────
 
-function Thumb({ tpl, selected, onClick }: { tpl: Tpl; selected: boolean; onClick: () => void }) {
-  const sb = tpl.sidebarBg || tpl.primary
-  const colorHdr = tpl.headerBg !== '#ffffff'
+const THUMB_SCALE = 108 / 794
 
+function Thumb({ tpl, selected, onClick }: { tpl: Tpl; selected: boolean; onClick: () => void }) {
   return (
     <div onClick={onClick} style={{
-      width: 108, minHeight: 140, borderRadius: 8, overflow: 'hidden',
+      width: 108, height: 152, borderRadius: 8, overflow: 'hidden',
       border: selected ? '2.5px solid var(--primary)' : '2px solid var(--border)',
-      cursor: 'pointer', background: '#fff', flexShrink: 0, position: 'relative',
+      cursor: 'pointer', position: 'relative', flexShrink: 0,
       boxShadow: selected ? '0 0 0 3px rgba(124,58,237,0.22)' : 'var(--shadow-sm)',
-      transition: 'all .15s',
+      transition: 'border .15s, box-shadow .15s',
     }}>
       {selected && (
-        <div style={{ position: 'absolute', top: 4, right: 4, width: 16, height: 16, background: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+        <div style={{
+          position: 'absolute', top: 4, right: 4, width: 16, height: 16,
+          background: 'var(--primary)', borderRadius: '50%', zIndex: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
           <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>✓</span>
         </div>
       )}
-
-      {tpl.layout === 'sidebar' ? (
-        <div style={{ display: 'flex', minHeight: 140 }}>
-          <div style={{ width: 30, minHeight: 140, background: sb, padding: '8px 4px', display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <div style={{ height: 4, background: 'rgba(255,255,255,0.75)', borderRadius: 2, width: '80%' }} />
-            <div style={{ height: 3, background: 'rgba(255,255,255,0.5)', borderRadius: 2, width: '65%' }} />
-            {[50, 70, 45, 60, 55, 50, 40].map((w, i) => (
-              <div key={i} style={{ height: 2, background: 'rgba(255,255,255,0.32)', borderRadius: 2, width: `${w}%`, marginTop: i === 2 ? 3 : 0 }} />
-            ))}
-          </div>
-          <div style={{ flex: 1, padding: '8px 5px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <div style={{ height: 3, background: tpl.primary, borderRadius: 2, width: '88%', marginBottom: 2, opacity: 0.75 }} />
-            {[80, 65, 85, 50, 70, 60, 85, 50, 75, 45].map((w, i) => (
-              <div key={i} style={{ height: 2, background: i % 5 === 0 ? tpl.primary : '#e5e7eb', borderRadius: 2, width: `${w}%`, opacity: i % 5 === 0 ? 0.8 : 1, marginTop: i % 5 === 0 ? 3 : 0 }} />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <>
-          <div style={{ background: tpl.headerBg, padding: '8px 7px', borderBottom: colorHdr ? 'none' : `2px solid ${tpl.primary}` }}>
-            <div style={{ height: 5, background: colorHdr ? tpl.headerText : tpl.primary, borderRadius: 2, opacity: 0.9, width: '72%', marginBottom: 3 }} />
-            <div style={{ height: 2, background: colorHdr ? tpl.headerText : '#9ca3af', borderRadius: 2, opacity: 0.55, width: '52%' }} />
-          </div>
-          <div style={{ padding: '6px 7px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {[38, 80, 65, 85, 55, 33, 75, 60, 88, 50, 70, 42].map((w, i) => (
-              <div key={i} style={{
-                height: i % 4 === 0 ? 3 : 2,
-                background: i % 4 === 0 ? tpl.primary : '#e5e7eb',
-                borderRadius: 2, width: `${w}%`,
-                opacity: i % 4 === 0 ? 0.8 : 1,
-                marginTop: i % 4 === 0 ? 3 : 0,
-              }} />
-            ))}
-          </div>
-        </>
-      )}
+      <div
+        style={{ width: 794, transformOrigin: 'top left', transform: `scale(${THUMB_SCALE})`, pointerEvents: 'none' }}
+        dangerouslySetInnerHTML={{ __html: THUMB_HTMLS[tpl.id] }}
+      />
     </div>
   )
 }
@@ -244,77 +235,31 @@ interface Props { scanId: string; targetRole: string; isPro: boolean }
 export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
   const [selectedId, setSelectedId] = useState('ats-classic')
   const [filter, setFilter] = useState('all')
-  const [resumeText, setResumeText] = useState<string | null>(null)
-  const [fetchLoading, setFetchLoading] = useState(false)
-  const [fetchError, setFetchError] = useState('')
   const [dlLoading, setDlLoading] = useState<'pdf' | 'docx' | null>(null)
   const [dlError, setDlError] = useState('')
 
   const selected = TEMPLATES.find(t => t.id === selectedId) ?? TEMPLATES[0]
   const visible = filter === 'all' ? TEMPLATES : TEMPLATES.filter(t => t.category === filter)
 
-  useEffect(() => {
-    if (!isPro) return
-    setFetchLoading(true)
-    const raw = localStorage.getItem('atsbrain_user')
-    const token = raw ? (() => { try { return JSON.parse(raw).token } catch { return null } })() : null
-    fetch(`/api/analyze/${scanId}/optimized`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('Could not load resume')))
-      .then(d => setResumeText(d.text))
-      .catch(e => setFetchError(e.message))
-      .finally(() => setFetchLoading(false))
-  }, [scanId, isPro])
-
   const getToken = () => {
     try { const s = localStorage.getItem('atsbrain_user'); return s ? JSON.parse(s).token : null } catch { return null }
   }
 
-  const downloadPdf = async () => {
-    if (!resumeText) return
-    if (!window.html2pdf) { setDlError('PDF generator not loaded. Please refresh.'); return }
-    setDlLoading('pdf'); setDlError('')
-    const el = document.createElement('div')
+  const downloadFile = async (type: 'pdf' | 'docx') => {
+    setDlLoading(type); setDlError('')
     try {
-      const html = buildResumeHtml(resumeText, selected)
-      el.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#ffffff'
-      el.innerHTML = html
-      document.body.appendChild(el)
-      // wait for browser to paint the element before html2canvas captures it
-      await new Promise(resolve => setTimeout(resolve, 200))
-      await window.html2pdf()
-        .set({
-          margin: 0,
-          filename: `${targetRole.replace(/\s+/g, '_')}_${selected.id}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale: 2, useCORS: true, letterRendering: true,
-            scrollX: 0, scrollY: 0, windowWidth: 794,
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        })
-        .from(el)
-        .save()
-    } catch {
-      setDlError('PDF generation failed. Please try again.')
-    } finally {
-      if (document.body.contains(el)) document.body.removeChild(el)
-      setDlLoading(null)
-    }
-  }
-
-  const downloadDocx = async () => {
-    setDlLoading('docx'); setDlError('')
-    try {
-      const res = await fetch(`/api/analyze/${scanId}/download/docx?template_id=${selected.id}`, {
+      const res = await fetch(`/api/analyze/${scanId}/download/${type}?template_id=${selected.id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       })
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.detail || 'Download failed') }
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        throw new Error(e.detail || 'Download failed')
+      }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url; a.download = `${targetRole.replace(/\s+/g, '_')}_${selected.id}.docx`
+      a.href = url
+      a.download = `${targetRole.replace(/\s+/g, '_')}_${selected.id}.${type}`
       document.body.appendChild(a); a.click(); document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (e: unknown) {
@@ -352,11 +297,8 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
         </div>
       </div>
 
-      {fetchLoading && <p style={{ color: 'var(--muted)', fontSize: '.85rem', marginBottom: 12 }}>Loading your optimized resume…</p>}
-      {fetchError && <div className="alert alert-error" style={{ marginBottom: 12 }}>{fetchError}</div>}
       {dlError && <div className="alert alert-error" style={{ marginBottom: 12 }}>{dlError}</div>}
 
-      {/* Template grid */}
       <div className="template-grid">
         {visible.map(tpl => (
           <div key={tpl.id} className="template-item">
@@ -371,7 +313,6 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
         ))}
       </div>
 
-      {/* Download bar */}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 6, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 140 }}>
           <p style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: 2 }}>Selected: {selected.name}</p>
@@ -382,15 +323,15 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
         </div>
         <button
           className="btn btn-accent btn-sm"
-          onClick={downloadPdf}
-          disabled={!resumeText || dlLoading !== null}
+          onClick={() => downloadFile('pdf')}
+          disabled={dlLoading !== null}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
           <Download size={13} /> {dlLoading === 'pdf' ? 'Generating PDF…' : 'Download PDF'}
         </button>
         <button
           className="btn btn-primary btn-sm"
-          onClick={downloadDocx}
+          onClick={() => downloadFile('docx')}
           disabled={dlLoading !== null}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >

@@ -163,6 +163,77 @@ def _create_docx(text: str, template_id: str, target_role: str) -> bytes:
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+# ── PDF generator ─────────────────────────────────────────────────────────────
+
+def _create_pdf(text: str, template_id: str) -> bytes:
+    from fpdf import FPDF
+
+    primary_hex = _PALETTE.get(template_id, "111827")
+    pr = int(primary_hex[0:2], 16)
+    pg = int(primary_hex[2:4], 16)
+    pb = int(primary_hex[4:6], 16)
+
+    parsed = _parse_resume(text)
+
+    def safe(s: str) -> str:
+        return s.encode("latin-1", errors="replace").decode("latin-1")
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.add_page()
+    pdf.set_margins(18, 18, 18)
+    ew = pdf.w - 36
+
+    # Name
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.set_text_color(pr, pg, pb)
+    pdf.multi_cell(ew, 10, safe(parsed.get("name", "")))
+
+    # Contact
+    contact = parsed.get("contact", [])
+    if contact:
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(107, 114, 128)
+        pdf.multi_cell(ew, 5, safe("  |  ".join(contact)))
+    pdf.ln(3)
+
+    # Divider
+    y = pdf.get_y()
+    pdf.set_draw_color(pr, pg, pb)
+    pdf.set_line_width(0.5)
+    pdf.line(18, y, pdf.w - 18, y)
+    pdf.ln(6)
+
+    # Sections
+    for section in parsed.get("sections", []):
+        if pdf.get_y() > pdf.h - 45:
+            pdf.add_page()
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(pr, pg, pb)
+        pdf.multi_cell(ew, 6, safe(section["title"].upper()))
+        y = pdf.get_y()
+        pdf.set_draw_color(pr, pg, pb)
+        pdf.set_line_width(0.3)
+        pdf.line(18, y, pdf.w - 18, y)
+        pdf.ln(2)
+
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(55, 65, 81)
+        for line in section.get("lines", []):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            is_bullet = stripped[0] in ("-", "*", "•")
+            if is_bullet:
+                content = stripped.lstrip("-*• ").strip()
+                pdf.multi_cell(ew, 5, safe("  - " + content))
+            else:
+                pdf.multi_cell(ew, 5, safe(stripped))
+        pdf.ln(5)
+
+    return bytes(pdf.output())
+
 settings = get_settings()
 
 FREE_FIELDS = {"keyword_score", "format_score", "content_score", "readability_score",
@@ -392,6 +463,55 @@ async def download_docx(
     return Response(
         content=docx_bytes,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{scan_id}/download/pdf")
+async def download_pdf(
+    scan_id: str,
+    template_id: str = "ats-classic",
+    user=Depends(get_current_user),
+    profile=Depends(get_current_profile),
+):
+    if profile["plan"] != "pro":
+        raise HTTPException(status_code=403, detail="Resume download requires Pro plan (₹299/month).")
+
+    scan = (
+        supabase_admin.table("scans")
+        .select("optimized_resume, result_json, target_role")
+        .eq("id", scan_id)
+        .eq("user_id", user.id)
+        .single()
+        .execute()
+    )
+    if not scan.data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    text = scan.data.get("optimized_resume")
+    if not text:
+        full = scan.data.get("result_json") or {}
+        missing = full.get("missing_keywords", [])
+        resume_text = full.get("_resume_text", "")
+        target_role = scan.data["target_role"]
+        try:
+            text = generate_optimized_resume(resume_text, target_role, missing)
+            supabase_admin.table("scans").update({"optimized_resume": text}).eq("id", scan_id).execute()
+        except Exception as e:
+            logger.error(f"Optimized resume generation for PDF failed: {e}")
+            raise HTTPException(status_code=500, detail="Could not generate optimized resume")
+
+    try:
+        pdf_bytes = _create_pdf(text, template_id)
+    except Exception as e:
+        logger.error(f"PDF creation failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not create PDF file")
+
+    safe_role = re.sub(r"[^\w\s-]", "", scan.data["target_role"]).strip().replace(" ", "_")
+    filename = f"{safe_role}_{template_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

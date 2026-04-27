@@ -24,6 +24,7 @@ aiohttp==3.9.5
 pdfplumber==0.10.1             # Reliable PDF text extraction
 PyMuPDF==1.24.7                # PDF text extraction fallback (fitz)
 python-docx==1.1.2             # DOCX extraction
+fpdf2==2.7.9                   # PDF generation for resume downloads
 
 # Email
 resend==2.0.0
