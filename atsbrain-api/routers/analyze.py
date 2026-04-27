@@ -61,6 +61,15 @@ async def run_analysis(
     except Exception as db_err:
         logger.warning(f"Failed to update scan count: {db_err}")
 
+    # Pro users get the full result without needing per-scan unlock
+    if profile.get("plan") == "pro":
+        if scan_id:
+            try:
+                supabase_admin.table("scans").update({"is_unlocked": True}).eq("id", scan_id).execute()
+            except Exception:
+                pass
+        return {"scan_id": scan_id, "is_unlocked": True, "result": result}
+
     return {"scan_id": scan_id, "is_unlocked": False, "result": _free_result(result)}
 
 
@@ -78,7 +87,7 @@ async def scan_history(user=Depends(get_current_user)):
 
 
 @router.get("/{scan_id}")
-async def get_scan(scan_id: str, user=Depends(get_current_user)):
+async def get_scan(scan_id: str, user=Depends(get_current_user), profile=Depends(get_current_profile)):
     result = (
         supabase_admin.table("scans")
         .select("*")
@@ -92,7 +101,9 @@ async def get_scan(scan_id: str, user=Depends(get_current_user)):
 
     scan = result.data
     full = scan.get("result_json") or {}
-    if scan.get("is_unlocked"):
+    # Pro users get full access without per-scan unlock
+    is_unlocked = scan.get("is_unlocked") or profile.get("plan") == "pro"
+    if is_unlocked:
         return {"scan_id": scan_id, "is_unlocked": True,
                 "target_role": scan["target_role"], "experience_level": scan["experience_level"],
                 "created_at": scan["created_at"], "result": full}

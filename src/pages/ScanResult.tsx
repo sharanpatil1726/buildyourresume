@@ -139,7 +139,7 @@ export default function ScanResult() {
   if (!scan) return <div className="page"><div className="page-inner"><div className="alert alert-error">{error || 'Scan not found'}</div></div></div>
 
   const r = safeObj(scan.result)
-  const isUnlocked = !!scan.is_unlocked
+  const isUnlocked = !!scan.is_unlocked || user?.plan === 'pro'
   const atsBreakdown = safeObj(r.ats_breakdown)
   const interviewLikelihood = safeObj(r.interview_likelihood)
   const gapAnalysis = safeObj(r.gap_analysis)
@@ -336,12 +336,29 @@ export default function ScanResult() {
             <div className="lock-overlay">
               <div className="lock-icon">🔒</div>
               <div className="lock-title">Unlock Full Analysis</div>
-              <div className="lock-price">₹49</div>
-              <div className="lock-desc">ATS Score, Weaknesses, Interview Q&A, Salary Tips, Market Analysis &amp; more</div>
+              <div className="lock-price">₹49 <span style={{ fontSize: '.55em', fontWeight: 400, color: 'var(--muted)' }}>one-time</span></div>
+              <ul style={{ textAlign: 'left', listStyle: 'none', padding: '0 8px', margin: '10px 0 16px', lineHeight: 1.9, fontSize: '.85rem' }}>
+                {[
+                  '📊 Overall ATS Score',
+                  '⚡ Weaknesses & Quick Fixes',
+                  '🎤 Interview Questions (role-specific)',
+                  '💰 Salary Negotiation Tips',
+                  '📈 2025 Market Analysis',
+                  '🗺 Role-Specific Career Guide',
+                  '📄 Optimised Resume Download',
+                ].map(item => (
+                  <li key={item} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: '.8em' }}>✓</span> {item}
+                  </li>
+                ))}
+              </ul>
               <button className="btn btn-gold btn-lg" onClick={handleUnlock} disabled={unlockLoading} style={{ marginTop: 4 }}>
                 {unlockLoading ? '⏳ Opening payment…' : '🔓 Unlock for ₹49'}
               </button>
-              <p style={{ fontSize: '.75rem', color: 'var(--muted)' }}>One-time payment · No subscription</p>
+              <p style={{ fontSize: '.72rem', color: 'var(--muted)', marginTop: 8 }}>One-time · Instant · No subscription</p>
+              <a href="/pricing" style={{ fontSize: '.75rem', color: 'var(--primary)', marginTop: 4, display: 'block' }}>
+                Or upgrade to Pro for unlimited unlocks →
+              </a>
             </div>
           )}
         </div>

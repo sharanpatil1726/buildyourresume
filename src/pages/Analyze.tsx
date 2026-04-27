@@ -192,7 +192,7 @@ export default function Analyze() {
       const res = await api.analyze.run({ resume_text: uploaded.raw_text, target_role: targetRole, experience_level: expLevel })
       setResult(res.result)
       setScanId(res.scan_id)
-      setIsUnlocked(res.is_unlocked)
+      setIsUnlocked(res.is_unlocked || user?.plan === 'pro')
       localStorage.setItem('atsbrain_target_role', targetRole)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Analysis failed. Please try again.')

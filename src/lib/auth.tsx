@@ -10,6 +10,7 @@ interface User {
 interface AuthCtx {
   user: User | null
   login: (email: string, password: string) => Promise<void>
+  loginWithGoogleSession: (token: string, email: string, plan: string, userId: string) => void
   logout: () => void
   refreshPlan: (plan: string) => void
 }
@@ -49,6 +50,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  const loginWithGoogleSession = (token: string, email: string, plan: string, userId: string) => {
+    const u: User = { user_id: userId, email, plan, token }
+    localStorage.setItem('atsbrain_user', JSON.stringify(u))
+    setUser(u)
+  }
+
   const refreshPlan = (plan: string) => {
     if (!user) return
     const updated = { ...user, plan }
@@ -56,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updated)
   }
 
-  return <Ctx.Provider value={{ user, login, logout, refreshPlan }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ user, login, loginWithGoogleSession, logout, refreshPlan }}>{children}</Ctx.Provider>
 }
 
 export const useAuth = () => useContext(Ctx)

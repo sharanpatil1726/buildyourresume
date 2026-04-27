@@ -10,6 +10,7 @@ import Jobs from './pages/Jobs'
 import Tracker from './pages/Tracker'
 import Pricing from './pages/Pricing'
 import ScanResult from './pages/ScanResult'
+import AuthCallback from './pages/AuthCallback'
 
 const TECH_WORDS = [
   'Python', 'React', 'Node.js', 'AWS', 'Docker', 'Kubernetes',
@@ -61,6 +62,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
           <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
 
           <Route element={<ProtectedRoute />}>

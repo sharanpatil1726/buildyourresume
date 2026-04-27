@@ -65,4 +65,21 @@ async def get_me(user=__import__("fastapi").Depends(__import__("middleware").get
         .single()
         .execute()
     )
-    return profile.data
+    if not profile.data:
+        # Auto-create profile for first-time Google OAuth users
+        try:
+            new_profile = supabase_admin.table("profiles").upsert({
+                "id": user.id,
+                "email": getattr(user, "email", ""),
+                "plan": "free",
+                "scans_used": 0,
+                "scans_limit": 3,
+            }).execute()
+            data = dict(new_profile.data[0]) if new_profile.data else {}
+        except Exception:
+            data = {}
+    else:
+        data = dict(profile.data)
+    data["id"] = user.id
+    data["email"] = getattr(user, "email", data.get("email", ""))
+    return data
