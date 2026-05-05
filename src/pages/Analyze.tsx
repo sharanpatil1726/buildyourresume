@@ -189,7 +189,12 @@ export default function Analyze() {
     try {
       const uploaded = await api.resume.upload(file)
       setResumeText(uploaded.raw_text)
-      const res = await api.analyze.run({ resume_text: uploaded.raw_text, target_role: targetRole, experience_level: expLevel })
+      const res = await api.analyze.run({
+        resume_text: uploaded.raw_text,
+        target_role: targetRole,
+        experience_level: expLevel,
+        resume_id: uploaded.resume_id,
+      })
       setResult(res.result)
       setScanId(res.scan_id)
       setIsUnlocked(res.is_unlocked || user?.plan === 'pro')

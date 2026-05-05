@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Download } from './Icons'
 
 interface Tpl {
@@ -237,6 +237,8 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
   const [filter, setFilter] = useState('all')
   const [dlLoading, setDlLoading] = useState<'pdf' | 'docx' | null>(null)
   const [dlError, setDlError] = useState('')
+  const [previewText, setPreviewText] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   const selected = TEMPLATES.find(t => t.id === selectedId) ?? TEMPLATES[0]
   const visible = filter === 'all' ? TEMPLATES : TEMPLATES.filter(t => t.category === filter)
@@ -245,7 +247,43 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
     try { const s = localStorage.getItem('atsbrain_user'); return s ? JSON.parse(s).token : null } catch { return null }
   }
 
+  useEffect(() => {
+    if (!isPro) {
+      setPreviewText('')
+      return
+    }
+
+    let cancelled = false
+    setPreviewLoading(true)
+    setDlError('')
+    fetch(`/api/analyze/${scanId}/optimized`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    })
+      .then(async res => {
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}))
+          throw new Error(e.detail || 'Could not build resume preview')
+        }
+        return res.json() as Promise<{ text: string }>
+      })
+      .then(data => {
+        if (!cancelled) setPreviewText(data.text || '')
+      })
+      .catch(e => {
+        if (!cancelled) setDlError(e instanceof Error ? e.message : 'Could not build resume preview')
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [scanId, isPro])
+
   const downloadFile = async (type: 'pdf' | 'docx') => {
+    if (!isPro) {
+      window.location.href = '/pricing'
+      return
+    }
     setDlLoading(type); setDlError('')
     try {
       const res = await fetch(`/api/analyze/${scanId}/download/${type}?template_id=${selected.id}`, {
@@ -269,15 +307,7 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
     }
   }
 
-  if (!isPro) return (
-    <div className="card" style={{ textAlign: 'center', padding: '24px', background: 'linear-gradient(135deg,#fffbeb,white)', marginBottom: 16 }}>
-      <p style={{ fontWeight: 700, marginBottom: 8, fontSize: '.95rem' }}>35 Resume Templates</p>
-      <p style={{ color: 'var(--muted)', fontSize: '.85rem', marginBottom: 12 }}>
-        Pick a template, download instantly as PDF or DOCX — Pro plan only.
-      </p>
-      <a href="/pricing" className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>Upgrade to Pro</a>
-    </div>
-  )
+  const previewHtml = buildResumeHtml(previewText || DUMMY, selected)
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
@@ -298,6 +328,11 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
       </div>
 
       {dlError && <div className="alert alert-error" style={{ marginBottom: 12 }}>{dlError}</div>}
+      {!isPro && (
+        <div className="alert" style={{ marginBottom: 12, background: 'var(--gold-light)', color: 'var(--gold)', border: '1px solid rgba(245,158,11,.35)' }}>
+          Preview the designs below. Downloading the optimized resume as PDF or DOCX requires Pro.
+        </div>
+      )}
 
       <div className="template-grid">
         {visible.map(tpl => (
@@ -311,6 +346,33 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
             </span>
           </div>
         ))}
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: '.9rem', marginBottom: 2 }}>Preview: {selected.name}</p>
+            <p style={{ color: 'var(--muted)', fontSize: '.75rem' }}>
+              {previewLoading
+                ? 'Building your ATS-optimized resume preview…'
+                : isPro
+                  ? 'This preview uses the optimized resume content that will be downloaded.'
+                  : 'Sample content is shown until Pro download is enabled.'}
+            </p>
+          </div>
+          {!isPro && <a href="/pricing" className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>Upgrade to Pro</a>}
+        </div>
+        <div className="resume-preview-frame">
+          {previewLoading ? (
+            <div className="loader-wrap" style={{ minHeight: 260 }}><div className="loader" /></div>
+          ) : (
+            <iframe
+              title={`${selected.name} resume preview`}
+              className="resume-preview-iframe"
+              srcDoc={`<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#e5e7eb;padding:18px;display:flex;justify-content:center}*{box-sizing:border-box}</style></head><body>${previewHtml}</body></html>`}
+            />
+          )}
+        </div>
       </div>
 
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 6, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -327,7 +389,7 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
           disabled={dlLoading !== null}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <Download size={13} /> {dlLoading === 'pdf' ? 'Generating PDF…' : 'Download PDF'}
+          <Download size={13} /> {dlLoading === 'pdf' ? 'Generating PDF…' : isPro ? 'Download PDF' : 'Upgrade for PDF'}
         </button>
         <button
           className="btn btn-primary btn-sm"
@@ -335,7 +397,7 @@ export default function TemplateSelector({ scanId, targetRole, isPro }: Props) {
           disabled={dlLoading !== null}
           style={{ display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <Download size={13} /> {dlLoading === 'docx' ? 'Generating DOCX…' : 'Download DOCX'}
+          <Download size={13} /> {dlLoading === 'docx' ? 'Generating DOCX…' : isPro ? 'Download DOCX' : 'Upgrade for DOCX'}
         </button>
       </div>
     </div>

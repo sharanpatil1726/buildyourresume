@@ -72,7 +72,77 @@ def _parse_resume(text: str) -> dict:
     if cur:
         sections.append(cur)
 
+    if not sections and body_start < len(lines):
+        sections.append({"title": "PROFESSIONAL SUMMARY", "lines": lines[body_start:]})
+
     return {"name": name, "contact": contact, "sections": sections}
+
+
+def _source_resume_text(scan: dict, user_id: str) -> str:
+    full = scan.get("result_json") or {}
+    text = (full.get("_resume_text") or "").strip()
+    if text:
+        return text
+
+    resume_id = scan.get("resume_id")
+    if resume_id:
+        try:
+            resume = (
+                supabase_admin.table("resumes")
+                .select("raw_text")
+                .eq("id", resume_id)
+                .eq("user_id", user_id)
+                .single()
+                .execute()
+            )
+            text = ((resume.data or {}).get("raw_text") or "").strip()
+            if text:
+                return text
+        except Exception as e:
+            logger.warning(f"Could not load source resume {resume_id}: {e}")
+
+    try:
+        latest = (
+            supabase_admin.table("resumes")
+            .select("raw_text")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if latest.data:
+            return (latest.data[0].get("raw_text") or "").strip()
+    except Exception as e:
+        logger.warning(f"Could not load latest source resume for {user_id}: {e}")
+
+    return ""
+
+
+def _optimized_resume_for_scan(scan_id: str, scan: dict, user_id: str) -> str:
+    text = (scan.get("optimized_resume") or "").strip()
+    if text:
+        return text
+
+    full = scan.get("result_json") or {}
+    missing = full.get("missing_keywords", [])
+    resume_text = _source_resume_text(scan, user_id)
+    if len(resume_text) < 100:
+        raise HTTPException(
+            status_code=422,
+            detail="Could not find the original resume content for this scan. Please run a new scan and then download.",
+        )
+
+    target_role = scan["target_role"]
+    text = generate_optimized_resume(resume_text, target_role, missing).strip()
+    if len(text) < 100:
+        raise HTTPException(status_code=500, detail="Optimized resume came back empty. Please try again.")
+
+    try:
+        supabase_admin.table("scans").update({"optimized_resume": text}).eq("id", scan_id).execute()
+    except Exception as e:
+        logger.warning(f"Could not cache optimized resume for scan {scan_id}: {e}")
+
+    return text
 
 # ── DOCX generator ────────────────────────────────────────────────────────────
 
@@ -262,6 +332,7 @@ async def run_analysis(
 
     scan_id = None
     try:
+        result_with_source = {**result, "_resume_text": body.resume_text}
         scan = supabase_admin.table("scans").insert({
             "user_id":          user.id,
             "resume_id":        body.resume_id,
@@ -272,7 +343,7 @@ async def run_analysis(
             "format_score":     int(result.get("format_score") or 0),
             "content_score":    int(result.get("content_score") or 0),
             "readability_score": int(result.get("readability_score") or 0),
-            "result_json":      result,
+            "result_json":      result_with_source,
             "is_unlocked":      False,
         }).execute()
         scan_id = scan.data[0]["id"]
@@ -387,7 +458,7 @@ async def get_optimized_resume(scan_id: str, user=Depends(get_current_user), pro
         )
     scan = (
         supabase_admin.table("scans")
-        .select("optimized_resume, result_json, target_role")
+        .select("optimized_resume, result_json, target_role, resume_id")
         .eq("id", scan_id)
         .eq("user_id", user.id)
         .single()
@@ -396,24 +467,13 @@ async def get_optimized_resume(scan_id: str, user=Depends(get_current_user), pro
     if not scan.data:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    if scan.data.get("optimized_resume"):
-        return {"text": scan.data["optimized_resume"]}
-
-    full = scan.data.get("result_json") or {}
-    missing = full.get("missing_keywords", [])
-    resume_text = full.get("_resume_text", "")
-    target_role = scan.data["target_role"]
-
     try:
-        optimized = generate_optimized_resume(resume_text, target_role, missing)
+        optimized = _optimized_resume_for_scan(scan_id, scan.data, user.id)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Optimized resume generation failed: {e}")
         raise HTTPException(status_code=500, detail="Could not generate optimized resume")
-
-    try:
-        supabase_admin.table("scans").update({"optimized_resume": optimized}).eq("id", scan_id).execute()
-    except Exception:
-        pass
 
     return {"text": optimized}
 
@@ -430,7 +490,7 @@ async def download_docx(
 
     scan = (
         supabase_admin.table("scans")
-        .select("optimized_resume, result_json, target_role")
+        .select("optimized_resume, result_json, target_role, resume_id")
         .eq("id", scan_id)
         .eq("user_id", user.id)
         .single()
@@ -439,18 +499,13 @@ async def download_docx(
     if not scan.data:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    text = scan.data.get("optimized_resume")
-    if not text:
-        full = scan.data.get("result_json") or {}
-        missing = full.get("missing_keywords", [])
-        resume_text = full.get("_resume_text", "")
-        target_role = scan.data["target_role"]
-        try:
-            text = generate_optimized_resume(resume_text, target_role, missing)
-            supabase_admin.table("scans").update({"optimized_resume": text}).eq("id", scan_id).execute()
-        except Exception as e:
-            logger.error(f"Optimized resume generation for DOCX failed: {e}")
-            raise HTTPException(status_code=500, detail="Could not generate optimized resume")
+    try:
+        text = _optimized_resume_for_scan(scan_id, scan.data, user.id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Optimized resume generation for DOCX failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not generate optimized resume")
 
     try:
         docx_bytes = _create_docx(text, template_id, scan.data["target_role"])
@@ -479,7 +534,7 @@ async def download_pdf(
 
     scan = (
         supabase_admin.table("scans")
-        .select("optimized_resume, result_json, target_role")
+        .select("optimized_resume, result_json, target_role, resume_id")
         .eq("id", scan_id)
         .eq("user_id", user.id)
         .single()
@@ -488,18 +543,13 @@ async def download_pdf(
     if not scan.data:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    text = scan.data.get("optimized_resume")
-    if not text:
-        full = scan.data.get("result_json") or {}
-        missing = full.get("missing_keywords", [])
-        resume_text = full.get("_resume_text", "")
-        target_role = scan.data["target_role"]
-        try:
-            text = generate_optimized_resume(resume_text, target_role, missing)
-            supabase_admin.table("scans").update({"optimized_resume": text}).eq("id", scan_id).execute()
-        except Exception as e:
-            logger.error(f"Optimized resume generation for PDF failed: {e}")
-            raise HTTPException(status_code=500, detail="Could not generate optimized resume")
+    try:
+        text = _optimized_resume_for_scan(scan_id, scan.data, user.id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Optimized resume generation for PDF failed: {e}")
+        raise HTTPException(status_code=500, detail="Could not generate optimized resume")
 
     try:
         pdf_bytes = _create_pdf(text, template_id)
